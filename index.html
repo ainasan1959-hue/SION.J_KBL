@@ -197,7 +197,7 @@
   }
   .admin-header .title{ font-size:18px; font-weight:600; }
   .admin-header .date{ font-size:13px; color:#b9c0cd; }
-  .admin-header .back-link{ font-size:12px; color:#d9770b; cursor:pointer; margin-top:4px; }
+  .back-link{ font-size:12px; color:#d9770b; cursor:pointer; margin-top:4px; display:inline-block; }
   #adminMain{ padding:24px 20px; max-width:960px; margin:0 auto; }
   .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
   .toolbar button{
@@ -276,10 +276,12 @@
     </div>
 
     <div id="wpanel-progress" class="panel">
+      <div class="back-link" data-backto="report">← 日報にもどる</div>
       <div id="progressList"><div class="hint">読み込み中...</div></div>
     </div>
 
     <div id="wpanel-instructions" class="panel">
+      <div class="back-link" data-backto="report">← 日報にもどる</div>
       <div class="card">
         <div id="instructionsList"><div class="hint">お名前を入力すると指示が表示されます</div></div>
       </div>
@@ -343,6 +345,7 @@
     <input type="password" id="gatePassword" placeholder="合言葉">
     <button id="gateBtn">開く</button>
     <div class="err" id="gateErr"></div>
+    <div class="back-link" id="gateCancelLink" style="margin-top:14px; cursor:pointer;">← 戻る</div>
   </div>
 </div>
 
@@ -367,6 +370,7 @@
     <div class="tabs">
       <div class="tab-btn active" data-tab="dashboard">進捗状況</div>
       <div class="tab-btn" data-tab="instruct">指示配信</div>
+      <div class="tab-btn" data-tab="log">指示履歴</div>
     </div>
 
     <div class="panel active" id="panel-dashboard">
@@ -387,6 +391,7 @@
     </div>
 
     <div class="panel" id="panel-instruct">
+      <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
       <div class="form-card">
         <div class="field">
           <label>現場</label>
@@ -405,6 +410,13 @@
         <button id="instructSendBtn">この内容を配信する</button>
         <div id="instructMsg"></div>
       </div>
+    </div>
+
+    <div class="panel" id="panel-log">
+      <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
+      <div class="muted" style="margin:10px 0 14px;">これまでに配信した指示を、案件（現場）ごとにまとめています</div>
+      <div id="logLoading" class="hint">読み込み中...</div>
+      <div id="logList"></div>
     </div>
   </div>
 </div>
@@ -525,15 +537,18 @@ function loadInstructions(worker){
     });
 }
 
+function switchWorkerTab(name){
+  document.querySelectorAll('#workerTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.wtab === name));
+  document.querySelectorAll('#wpanel-report, #wpanel-instructions, #wpanel-progress').forEach(p => p.classList.remove('active'));
+  document.getElementById('wpanel-' + name).classList.add('active');
+  document.getElementById('submitBar').style.display = (name === 'report') ? 'block' : 'none';
+  if (name === 'progress') loadProgress();
+}
 document.querySelectorAll('#workerTabs .tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#workerTabs .tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#wpanel-report, #wpanel-instructions, #wpanel-progress').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('wpanel-' + btn.dataset.wtab).classList.add('active');
-    document.getElementById('submitBar').style.display = (btn.dataset.wtab === 'report') ? 'block' : 'none';
-    if (btn.dataset.wtab === 'progress') loadProgress();
-  });
+  btn.addEventListener('click', () => switchWorkerTab(btn.dataset.wtab));
+});
+document.querySelectorAll('#wpanel-instructions .back-link, #wpanel-progress .back-link').forEach(link => {
+  link.addEventListener('click', () => switchWorkerTab(link.dataset.backto));
 });
 
 const progressList = document.getElementById('progressList');
@@ -718,6 +733,11 @@ document.getElementById('gateBtn').addEventListener('click', checkGate);
 document.getElementById('gatePassword').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') checkGate();
 });
+document.getElementById('gateCancelLink').addEventListener('click', () => {
+  document.getElementById('gatePassword').value = '';
+  document.getElementById('gateErr').textContent = '';
+  document.getElementById('loginGate').style.display = 'none';
+});
 function checkGate() {
   const input = document.getElementById('gatePassword').value;
   if (input === CEO_PASSWORD) {
@@ -790,14 +810,51 @@ function initAdmin(){
   document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
   loadDashboard();
 
+  let logLoaded = false;
+  function switchAdminTab(name){
+    document.querySelectorAll('#adminMain .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('#adminMain .panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'log' && !logLoaded) { loadInstructionLog(); logLoaded = true; }
+  }
   document.querySelectorAll('#adminMain .tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#adminMain .tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('#adminMain .panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-    });
+    btn.addEventListener('click', () => switchAdminTab(btn.dataset.tab));
   });
+  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link').forEach(link => {
+    link.addEventListener('click', () => switchAdminTab(link.dataset.backto));
+  });
+
+  function loadInstructionLog(){
+    const logLoading = document.getElementById('logLoading');
+    const logList = document.getElementById('logList');
+    logLoading.style.display = 'block';
+    logList.innerHTML = '';
+    fetch(GAS_URL + '?action=instructionLog')
+      .then(r => r.json())
+      .then(data => {
+        const groups = data.log || [];
+        logLoading.style.display = 'none';
+        if (groups.length === 0) {
+          logList.innerHTML = '<div class="hint">まだ配信した指示はありません</div>';
+          return;
+        }
+        logList.innerHTML = groups.map(g => `
+          <div class="form-card" style="margin-bottom:14px;">
+            <div style="font-weight:700; font-size:14.5px; margin-bottom:10px;">${g.siteName}</div>
+            ${g.entries.map(e => `
+              <div style="padding:10px 0; border-bottom:1px solid var(--line);">
+                <div style="font-size:12px; color:var(--ink-soft); margin-bottom:3px;">${e.date}　宛先：${e.target === 'all' ? '全員' : e.target}</div>
+                <div style="font-size:13.5px;">${e.message}</div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+      })
+      .catch(() => {
+        logLoading.style.display = 'none';
+        logList.innerHTML = '<div class="hint">指示履歴の取得に失敗しました</div>';
+      });
+  }
 
   const instructTarget = document.getElementById('instructTarget');
   fetch(GAS_URL + '?action=workers')
