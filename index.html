@@ -261,47 +261,67 @@
   </header>
 
   <main>
-    <div id="formScreen">
-      <div class="card">
-        <div class="field">
-          <label>お名前<span class="req">必須</span></label>
-          <select id="workerSelect">
-            <option value="">選択してください</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>現場<span class="req">必須</span></label>
-          <select id="siteSelect">
-            <option value="">選択してください</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>工程<span class="req">必須</span></label>
-          <div class="status-group" id="statusGroup">
-            <div class="hint" id="statusPlaceholder">現場を選ぶと工程が表示されます</div>
-          </div>
-        </div>
-        <div class="field">
-          <label>作業内容<span class="req">必須</span></label>
-          <textarea id="content" placeholder="今日やった作業を簡単に入力してください"></textarea>
-        </div>
-        <div class="field">
-          <label>写真（任意）</label>
-          <label class="photo-box" for="photoInput">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.4"/></svg>
-          </label>
-          <input type="file" id="photoInput" accept="image/*" capture="environment" multiple class="hidden">
-          <div class="photo-preview" id="photoPreview"></div>
-          <div class="hint">現場写真があれば添付してください（なくても送信できます）</div>
-        </div>
+    <div class="card">
+      <div class="field" style="margin-bottom:0;">
+        <label>お名前<span class="req">必須</span></label>
+        <input type="text" id="workerName" placeholder="登録されているお名前を入力" autocomplete="off">
+        <div class="hint" id="workerNameHint"></div>
       </div>
     </div>
 
-    <div id="doneScreen" class="done-screen hidden">
-      <div class="check">✓</div>
-      <h2>報告を送信しました</h2>
-      <p id="doneDetail"></p>
-      <button id="againBtn">続けてもう1件報告する</button>
+    <div id="workerTabs" class="tabs hidden" style="margin-top:14px;">
+      <div class="tab-btn active" data-wtab="report">日報</div>
+      <div class="tab-btn" data-wtab="instructions">指示</div>
+      <div class="tab-btn" data-wtab="progress">進捗</div>
+    </div>
+
+    <div id="wpanel-progress" class="panel">
+      <div id="progressList"><div class="hint">読み込み中...</div></div>
+    </div>
+
+    <div id="wpanel-instructions" class="panel">
+      <div class="card">
+        <div id="instructionsList"><div class="hint">お名前を入力すると指示が表示されます</div></div>
+      </div>
+    </div>
+
+    <div id="wpanel-report" class="panel active">
+      <div id="formScreen">
+        <div class="card">
+          <div class="field">
+            <label>現場<span class="req">必須</span></label>
+            <select id="siteSelect">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>工程<span class="req">必須</span></label>
+            <div class="status-group" id="statusGroup">
+              <div class="hint" id="statusPlaceholder">現場を選ぶと工程が表示されます</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>作業内容<span class="req">必須</span></label>
+            <textarea id="content" placeholder="今日やった作業を簡単に入力してください"></textarea>
+          </div>
+          <div class="field">
+            <label>写真（任意）</label>
+            <label class="photo-box" for="photoInput">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.4"/></svg>
+            </label>
+            <input type="file" id="photoInput" accept="image/*" capture="environment" multiple class="hidden">
+            <div class="photo-preview" id="photoPreview"></div>
+            <div class="hint">現場写真があれば添付してください（なくても送信できます）</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="doneScreen" class="done-screen hidden">
+        <div class="check">✓</div>
+        <h2>報告を送信しました</h2>
+        <p id="doneDetail"></p>
+        <button id="againBtn">続けてもう1件報告する</button>
+      </div>
     </div>
 
     <div class="ceo-link" id="ceoLink">管理者ログイン</div>
@@ -441,28 +461,112 @@ const todayLabel = document.getElementById('todayLabel');
 const now = new Date();
 todayLabel.textContent = '電工日報　' + now.toLocaleDateString('ja-JP', { month:'long', day:'numeric', weekday:'short' });
 
-const workerSelect = document.getElementById('workerSelect');
+let VALID_WORKERS = [];
 function loadWorkers(){
-  workerSelect.innerHTML = '<option value="">読み込み中...</option>';
   fetch(GAS_URL + '?action=workers')
     .then(r => r.json())
-    .then(data => {
-      const workers = data.workers || [];
-      workerSelect.innerHTML = '<option value="">選択してください</option>';
-      workers.forEach(w => {
-        const opt = document.createElement('option');
-        opt.value = w; opt.textContent = w;
-        workerSelect.appendChild(opt);
-      });
-    })
-    .catch(() => {
-      workerSelect.innerHTML = '<option value="">職人一覧の取得に失敗しました</option>';
-    });
+    .then(data => { VALID_WORKERS = data.workers || []; })
+    .catch(() => { VALID_WORKERS = []; });
 }
 loadWorkers();
-workerSelect.addEventListener('change', () => {
-  if (workerSelect.value) setupPush(workerSelect.value);
+
+const workerNameInput = document.getElementById('workerName');
+const workerNameHint = document.getElementById('workerNameHint');
+const workerTabs = document.getElementById('workerTabs');
+const instructionsList = document.getElementById('instructionsList');
+let currentWorker = '';
+
+workerNameInput.addEventListener('blur', checkWorkerName);
+workerNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); checkWorkerName(); workerNameInput.blur(); }
 });
+
+function checkWorkerName(){
+  const input = workerNameInput.value.trim();
+  if (!input) {
+    currentWorker = '';
+    workerNameHint.textContent = '';
+    workerTabs.classList.add('hidden');
+    return;
+  }
+  const match = VALID_WORKERS.find(w => w === input);
+  if (match) {
+    currentWorker = match;
+    workerNameHint.textContent = '';
+    setupPush(currentWorker);
+    workerTabs.classList.remove('hidden');
+    loadInstructions(currentWorker);
+  } else {
+    currentWorker = '';
+    workerNameHint.textContent = '登録されているお名前と一致しません';
+    workerTabs.classList.add('hidden');
+  }
+}
+
+function loadInstructions(worker){
+  instructionsList.innerHTML = '<div class="hint">読み込み中...</div>';
+  fetch(GAS_URL + '?action=instructions&worker=' + encodeURIComponent(worker))
+    .then(r => r.json())
+    .then(data => {
+      const list = data.instructions || [];
+      if (list.length === 0) {
+        instructionsList.innerHTML = '<div class="hint">今のところ指示はありません</div>';
+        return;
+      }
+      instructionsList.innerHTML = list.map(it => `
+        <div style="padding:12px 0; border-bottom:1px solid var(--line);">
+          <div style="font-size:12px; color:var(--ink-soft); margin-bottom:4px;">${it.date}　${it.siteName || ''}</div>
+          <div style="font-size:14px;">${it.message}</div>
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      instructionsList.innerHTML = '<div class="hint">指示の取得に失敗しました</div>';
+    });
+}
+
+document.querySelectorAll('#workerTabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#workerTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#wpanel-report, #wpanel-instructions, #wpanel-progress').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('wpanel-' + btn.dataset.wtab).classList.add('active');
+    document.getElementById('submitBar').style.display = (btn.dataset.wtab === 'report') ? 'block' : 'none';
+    if (btn.dataset.wtab === 'progress') loadProgress();
+  });
+});
+
+const progressList = document.getElementById('progressList');
+function judgementBadgeSmall(j){
+  if (j === '順調') return '<span class="badge ok">順調</span>';
+  if (j === '遅れ') return '<span class="badge bad">遅れ</span>';
+  return '<span class="badge neutral">未判定</span>';
+}
+function loadProgress(){
+  progressList.innerHTML = '<div class="hint">読み込み中...</div>';
+  fetch(GAS_URL + '?action=dashboard')
+    .then(r => r.json())
+    .then(data => {
+      const sites = data.sites || [];
+      if (sites.length === 0) {
+        progressList.innerHTML = '<div class="hint">現場が登録されていません</div>';
+        return;
+      }
+      progressList.innerHTML = sites.map(s => `
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+            <div style="font-weight:700; font-size:14.5px;">${s.siteName}</div>
+            ${judgementBadgeSmall(s.judgement)}
+          </div>
+          <div style="font-size:13px; color:var(--ink-soft);">現在：${s.currentStageName}</div>
+          ${s.nextMilestoneName ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-top:2px;">次の予定：${s.nextMilestoneName}　${s.nextMilestoneDate}</div>` : ''}
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      progressList.innerHTML = '<div class="hint">進捗の取得に失敗しました</div>';
+    });
+}
 
 const siteSelect = document.getElementById('siteSelect');
 function loadSites(){
@@ -542,12 +646,12 @@ const submitBtn = document.getElementById('submitBtn');
 const statusMsg = document.getElementById('statusMsg');
 
 submitBtn.addEventListener('click', () => {
-  const worker = workerSelect.value;
+  const worker = currentWorker;
   const siteId = siteSelect.value;
   const siteName = siteSelect.options[siteSelect.selectedIndex]?.textContent || '';
   const content = document.getElementById('content').value.trim();
 
-  if(!worker){ showMsg('お名前を選択してください', true); return; }
+  if(!worker){ showMsg('お名前を正しく入力してください', true); return; }
   if(!siteId){ showMsg('現場を選択してください', true); return; }
   if(!selectedStage){ showMsg('工程を選択してください', true); return; }
   if(!content){ showMsg('作業内容を入力してください', true); return; }
@@ -686,10 +790,10 @@ function initAdmin(){
   document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
   loadDashboard();
 
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  document.querySelectorAll('#adminMain .tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('#adminMain .tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#adminMain .panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     });
