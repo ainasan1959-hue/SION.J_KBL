@@ -17,6 +17,9 @@
     --accent-dark: #a85a06;
     --navy: #1a1a1a;
     --ok: #2f7d5a;
+    --ok-bg: #e7f3ed; --ok-fg: #1f6f4a;
+    --bad-bg: #fbe9e7; --bad-fg: #b3261e;
+    --neutral-bg: #eceef1; --neutral-fg: #565d68;
     --radius: 14px;
   }
   * { box-sizing: border-box; }
@@ -182,72 +185,215 @@
     color:var(--ink);
   }
   .hidden{ display:none !important; }
+  .ceo-link{
+    text-align:center; font-size:11.5px; color:#b7b3a8;
+    padding:6px 0 90px;
+  }
+
+  /* ==== 管理者パネル（CEO用）==== */
+  .admin-header{
+    background:var(--navy); color:#fff; padding:20px 28px;
+    display:flex; align-items:baseline; justify-content:space-between;
+  }
+  .admin-header .title{ font-size:18px; font-weight:600; }
+  .admin-header .date{ font-size:13px; color:#b9c0cd; }
+  .admin-header .back-link{ font-size:12px; color:#d9770b; cursor:pointer; margin-top:4px; }
+  #adminMain{ padding:24px 20px; max-width:960px; margin:0 auto; }
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .toolbar button{
+    padding:8px 16px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; font-size:13.5px; font-weight:600; color:var(--ink); cursor:pointer;
+  }
+  table{ width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  thead th{ text-align:left; font-size:12px; color:var(--ink-soft); font-weight:600; padding:10px 16px; border-bottom:1px solid var(--line); background:#fafaf8; }
+  tbody td{ padding:13px 16px; font-size:13.5px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tbody tr:last-child td{ border-bottom:none; }
+  .site-name{ font-weight:600; }
+  .site-id{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .badge{ display:inline-block; padding:3px 12px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.ok{ background:var(--ok-bg); color:var(--ok-fg); }
+  .badge.bad{ background:var(--bad-bg); color:var(--bad-fg); }
+  .badge.neutral{ background:var(--neutral-bg); color:var(--neutral-fg); }
+  .muted{ color:var(--ink-soft); font-size:12.5px; }
+  #loading, #errorMsgAdmin{ padding:40px; text-align:center; color:var(--ink-soft); }
+  #errorMsgAdmin{ color:var(--bad-fg); display:none; }
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab-btn{
+    padding:8px 18px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+  .form-card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; max-width:520px; }
+  .form-card label{ display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+  .form-card .field{ margin-bottom:16px; }
+  .form-card select, .form-card textarea{ width:100%; font-size:14.5px; padding:10px; border:1.5px solid var(--line); border-radius:8px; }
+  .form-card textarea{ min-height:80px; }
+  .form-card button{ padding:12px 20px; border-radius:9px; border:none; background:var(--accent); color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; }
+  #instructMsg{ margin-top:10px; font-size:13px; font-weight:600; }
+
+  /* ログインゲート・役割選択 */
+  #loginGate{
+    position:fixed; inset:0; background:var(--bg);
+    display:none; align-items:center; justify-content:center; z-index:100;
+  }
+  #loginGate .box{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:32px 28px; width:280px; text-align:center; }
+  #loginGate .box .lock{ font-size:28px; margin-bottom:10px; }
+  #loginGate .box h2{ font-size:15px; margin:0 0 18px; }
+  #loginGate input{ width:100%; font-size:15px; padding:10px; border:1.5px solid var(--line); border-radius:8px; text-align:center; margin-bottom:10px; }
+  #loginGate button{ width:100%; padding:11px; border:none; border-radius:9px; background:var(--navy); color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+  #loginGate .err{ color:var(--bad-fg); font-size:12.5px; margin-top:8px; min-height:16px; }
+  #roleSelector{
+    display:none; position:fixed; inset:0; background:var(--bg);
+    align-items:center; justify-content:center; z-index:90; flex-direction:column; gap:14px;
+  }
+  #roleSelector button{ width:240px; padding:16px; border:none; border-radius:12px; color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="title">SION.J株式会社 <span style="font-size:11px; font-weight:600; color:#d9770b; border:1px solid #d9770b; border-radius:5px; padding:1px 6px; vertical-align:middle; margin-left:4px;">KBL</span></div>
-  <div class="sub" id="todayLabel"></div>
-</header>
+<!-- ===== 職人さん用：日報入力画面 ===== -->
+<div id="reportScreen">
+  <header>
+    <div class="title">SION.J株式会社 <span style="font-size:11px; font-weight:600; color:#d9770b; border:1px solid #d9770b; border-radius:5px; padding:1px 6px; vertical-align:middle; margin-left:4px;">KBL</span></div>
+    <div class="sub" id="todayLabel"></div>
+  </header>
 
-<main>
-  <div id="formScreen">
-    <div class="card">
-      <div class="field">
-        <label>お名前<span class="req">必須</span></label>
-        <select id="workerSelect">
-          <option value="">選択してください</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>現場<span class="req">必須</span></label>
-        <select id="siteSelect">
-          <option value="">選択してください</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>工程<span class="req">必須</span></label>
-        <div class="status-group" id="statusGroup">
-          <div class="hint" id="statusPlaceholder">現場を選ぶと工程が表示されます</div>
+  <main>
+    <div id="formScreen">
+      <div class="card">
+        <div class="field">
+          <label>お名前<span class="req">必須</span></label>
+          <select id="workerSelect">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>現場<span class="req">必須</span></label>
+          <select id="siteSelect">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>工程<span class="req">必須</span></label>
+          <div class="status-group" id="statusGroup">
+            <div class="hint" id="statusPlaceholder">現場を選ぶと工程が表示されます</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>作業内容<span class="req">必須</span></label>
+          <textarea id="content" placeholder="今日やった作業を簡単に入力してください"></textarea>
+        </div>
+        <div class="field">
+          <label>写真（任意）</label>
+          <label class="photo-box" for="photoInput">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.4"/></svg>
+          </label>
+          <input type="file" id="photoInput" accept="image/*" capture="environment" multiple class="hidden">
+          <div class="photo-preview" id="photoPreview"></div>
+          <div class="hint">現場写真があれば添付してください（なくても送信できます）</div>
         </div>
       </div>
-      <div class="field">
-        <label>作業内容<span class="req">必須</span></label>
-        <textarea id="content" placeholder="今日やった作業を簡単に入力してください"></textarea>
-      </div>
-      <div class="field">
-        <label>写真（任意）</label>
-        <label class="photo-box" for="photoInput">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.4"/></svg>
-        </label>
-        <input type="file" id="photoInput" accept="image/*" capture="environment" multiple class="hidden">
-        <div class="photo-preview" id="photoPreview"></div>
-        <div class="hint">現場写真があれば添付してください（なくても送信できます）</div>
-      </div>
+    </div>
+
+    <div id="doneScreen" class="done-screen hidden">
+      <div class="check">✓</div>
+      <h2>報告を送信しました</h2>
+      <p id="doneDetail"></p>
+      <button id="againBtn">続けてもう1件報告する</button>
+    </div>
+
+    <div class="ceo-link" id="ceoLink">管理者ログイン</div>
+  </main>
+
+  <div class="submit-bar" id="submitBar">
+    <div class="submit-bar-inner">
+      <button id="submitBtn">この内容で報告する</button>
+      <div id="statusMsg"></div>
     </div>
   </div>
+</div>
 
-  <div id="doneScreen" class="done-screen hidden">
-    <div class="check">✓</div>
-    <h2>報告を送信しました</h2>
-    <p id="doneDetail"></p>
-    <button id="againBtn">続けてもう1件報告する</button>
+<!-- ===== ログインゲート（CEO用）===== -->
+<div id="loginGate">
+  <div class="box">
+    <div class="lock">🔒</div>
+    <h2>KBL 管理画面<br>合言葉を入力してください</h2>
+    <input type="password" id="gatePassword" placeholder="合言葉">
+    <button id="gateBtn">開く</button>
+    <div class="err" id="gateErr"></div>
   </div>
-</main>
+</div>
 
-<div class="submit-bar" id="submitBar">
-  <div class="submit-bar-inner">
-    <button id="submitBtn">この内容で報告する</button>
-    <div id="statusMsg"></div>
+<!-- ===== 役割選択（CEO用）===== -->
+<div id="roleSelector">
+  <div style="font-size:15px; font-weight:700; margin-bottom:6px;">どちらを開きますか？</div>
+  <button id="goReportBtn" style="background:var(--accent);">日報を入力する</button>
+  <button id="goAdminBtn" style="background:var(--navy);">管理者パネルを開く</button>
+</div>
+
+<!-- ===== 管理者パネル（CEO用）===== -->
+<div id="adminScreen" class="hidden">
+  <div class="admin-header">
+    <div>
+      <div class="title">SION.J株式会社 <span style="font-size:11px; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:1px 6px;">KBL</span></div>
+      <div class="back-link" id="backToReportLink">← 日報入力にもどる</div>
+    </div>
+    <div class="date" id="dateLabel"></div>
+  </div>
+
+  <div id="adminMain">
+    <div class="tabs">
+      <div class="tab-btn active" data-tab="dashboard">進捗状況</div>
+      <div class="tab-btn" data-tab="instruct">指示配信</div>
+    </div>
+
+    <div class="panel active" id="panel-dashboard">
+      <div class="toolbar">
+        <div class="muted">現場ごとの現在の工程と、計画に対する判定を一覧表示しています</div>
+        <button id="refreshBtn">更新</button>
+      </div>
+      <div id="loading">読み込み中...</div>
+      <div id="errorMsgAdmin">現場一覧の取得に失敗しました</div>
+      <table id="table" style="display:none;">
+        <thead>
+          <tr>
+            <th>現場</th><th>現在の工程</th><th>次の予定</th><th>判定</th><th>最終報告</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="panel-instruct">
+      <div class="form-card">
+        <div class="field">
+          <label>現場</label>
+          <select id="instructSite"></select>
+        </div>
+        <div class="field">
+          <label>対象</label>
+          <select id="instructTarget">
+            <option value="all">全員</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>指示内容</label>
+          <textarea id="instructMessage" placeholder="例：明日は9時から2階の配線作業をお願いします"></textarea>
+        </div>
+        <button id="instructSendBtn">この内容を配信する</button>
+        <div id="instructMsg"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
-// ==== 設定：GASのWebアプリURLに差し替えてください ====
+// ==== 設定：GASのWebアプリURL ====
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyuABcVJ-tPZZc9NIKWx_PrxY4X-SkHdoR4taTJDPKSDc2wqGPjwADnp8TBfatkzqaNfg/exec";
 
-// ==== プッシュ通知設定（Cloudflare Workerデプロイ後に書き換える） ====
+// ==== プッシュ通知設定 ====
 const PUSH_WORKER_URL = "https://kbl-push.ainasan1959.workers.dev";
 const VAPID_PUBLIC_KEY = "BAXKJwcvLvHDgNmajXGtnaDXA0Nf2I5BfOdMA4CVCXCOZfL9xSs9HSG2I-IL9WHp2G08aJKkj-NwhhDXRwyKjRk";
 
@@ -262,13 +408,11 @@ function urlBase64ToUint8Array(base64String) {
 
 async function setupPush(workerName) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  if (!PUSH_WORKER_URL || PUSH_WORKER_URL.indexOf('★') !== -1) return; // 未設定なら何もしない
-
+  if (!PUSH_WORKER_URL || PUSH_WORKER_URL.indexOf('★') !== -1) return;
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return;
-
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
       sub = await reg.pushManager.subscribe({
@@ -276,7 +420,6 @@ async function setupPush(workerName) {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
     }
-
     await fetch(PUSH_WORKER_URL + '/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
@@ -287,17 +430,17 @@ async function setupPush(workerName) {
   }
 }
 
-// 現場・職人はいずれもスプレッドシートのマスタから取得する
+/* =========================================================
+   職人さん用：日報入力
+========================================================= */
 let SITES = [];
-
-let selectedStage = null; // { number, name }
-let photos = []; // {name, base64}
+let selectedStage = null;
+let photos = [];
 
 const todayLabel = document.getElementById('todayLabel');
 const now = new Date();
 todayLabel.textContent = '電工日報　' + now.toLocaleDateString('ja-JP', { month:'long', day:'numeric', weekday:'short' });
 
-// 職人名プルダウン生成（職人マスタシートから取得）
 const workerSelect = document.getElementById('workerSelect');
 function loadWorkers(){
   workerSelect.innerHTML = '<option value="">読み込み中...</option>';
@@ -321,7 +464,6 @@ workerSelect.addEventListener('change', () => {
   if (workerSelect.value) setupPush(workerSelect.value);
 });
 
-// 現場マスタ取得（GASのdoGetから）
 const siteSelect = document.getElementById('siteSelect');
 function loadSites(){
   siteSelect.innerHTML = '<option value="">読み込み中...</option>';
@@ -342,7 +484,6 @@ function loadSites(){
 }
 loadSites();
 
-// 現場を選んだら、その現場の工程一覧を取得して工程ボタンを描画
 const statusGroup = document.getElementById('statusGroup');
 siteSelect.addEventListener('change', () => {
   const siteId = siteSelect.value;
@@ -379,13 +520,12 @@ siteSelect.addEventListener('change', () => {
     });
 });
 
-// 写真プレビュー
 const photoInput = document.getElementById('photoInput');
 const photoPreview = document.getElementById('photoPreview');
 photoInput.addEventListener('change', () => {
   photos = [];
   photoPreview.innerHTML = '';
-  const files = Array.from(photoInput.files).slice(0, 3); // PoCでは最大3枚
+  const files = Array.from(photoInput.files).slice(0, 3);
   files.forEach(file => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -419,13 +559,12 @@ submitBtn.addEventListener('click', () => {
     worker, siteId, siteName,
     stageNumber: selectedStage.number,
     stageName: selectedStage.name,
-    content,
-    photos
+    content, photos
   };
 
   fetch(GAS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' }, // GAS側の制約を回避するためtext/plainで送りJSON文字列を渡す
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(payload)
   })
   .then(r => r.json())
@@ -460,6 +599,161 @@ document.getElementById('againBtn').addEventListener('click', () => {
 function showMsg(text, isErr){
   statusMsg.textContent = text;
   statusMsg.className = isErr ? 'err' : '';
+}
+
+/* =========================================================
+   CEO用：合言葉ログイン・役割選択・管理者パネル
+========================================================= */
+const CEO_PASSWORD = "sionj-ceo2026"; // 必要に応じて変更してください
+let adminLoaded = false;
+
+document.getElementById('ceoLink').addEventListener('click', () => {
+  document.getElementById('loginGate').style.display = 'flex';
+});
+document.getElementById('gateBtn').addEventListener('click', checkGate);
+document.getElementById('gatePassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') checkGate();
+});
+function checkGate() {
+  const input = document.getElementById('gatePassword').value;
+  if (input === CEO_PASSWORD) {
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('gatePassword').value = '';
+    document.getElementById('gateErr').textContent = '';
+    document.getElementById('roleSelector').style.display = 'flex';
+  } else {
+    document.getElementById('gateErr').textContent = '合言葉が違います';
+  }
+}
+
+document.getElementById('goReportBtn').addEventListener('click', () => {
+  document.getElementById('roleSelector').style.display = 'none';
+});
+document.getElementById('goAdminBtn').addEventListener('click', () => {
+  document.getElementById('roleSelector').style.display = 'none';
+  document.getElementById('reportScreen').classList.add('hidden');
+  document.getElementById('adminScreen').classList.remove('hidden');
+  if (!adminLoaded) { initAdmin(); adminLoaded = true; }
+});
+document.getElementById('backToReportLink').addEventListener('click', () => {
+  document.getElementById('adminScreen').classList.add('hidden');
+  document.getElementById('reportScreen').classList.remove('hidden');
+});
+
+function initAdmin(){
+  document.getElementById('dateLabel').textContent =
+    new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  function judgementBadge(j){
+    if(j === '順調') return '<span class="badge ok">順調</span>';
+    if(j === '遅れ') return '<span class="badge bad">遅れ</span>';
+    return '<span class="badge neutral">未判定</span>';
+  }
+
+  function loadDashboard(){
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('errorMsgAdmin').style.display = 'none';
+    document.getElementById('table').style.display = 'none';
+
+    fetch(GAS_URL + '?action=dashboard')
+      .then(r => r.json())
+      .then(data => {
+        const sites = data.sites || [];
+        const tbody = document.getElementById('tbody');
+        tbody.innerHTML = '';
+        sites.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <div class="site-name">${s.siteName}</div>
+              <div class="site-id">${s.siteId}</div>
+            </td>
+            <td>${s.currentStageName}</td>
+            <td>${s.nextMilestoneName ? s.nextMilestoneName + ' ' + s.nextMilestoneDate : '<span class="muted">-</span>'}</td>
+            <td>${judgementBadge(s.judgement)}</td>
+            <td class="muted">${s.lastReporter ? s.lastReporter + '　' + s.lastUpdated : '未報告'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('table').style.display = 'table';
+      })
+      .catch(() => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('errorMsgAdmin').style.display = 'block';
+      });
+  }
+  document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+  loadDashboard();
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  const instructTarget = document.getElementById('instructTarget');
+  fetch(GAS_URL + '?action=workers')
+    .then(r => r.json())
+    .then(data => {
+      (data.workers || []).forEach(w => {
+        const opt = document.createElement('option');
+        opt.value = w; opt.textContent = w;
+        instructTarget.appendChild(opt);
+      });
+    });
+
+  const instructSite = document.getElementById('instructSite');
+  fetch(GAS_URL + '?action=sites')
+    .then(r => r.json())
+    .then(data => {
+      (data.sites || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.dataset.name = s.name; opt.textContent = s.name;
+        instructSite.appendChild(opt);
+      });
+    });
+
+  document.getElementById('instructSendBtn').addEventListener('click', () => {
+    const siteOpt = instructSite.options[instructSite.selectedIndex];
+    const siteId = instructSite.value;
+    const siteName = siteOpt ? siteOpt.textContent : '';
+    const targetWorker = instructTarget.value;
+    const message = document.getElementById('instructMessage').value.trim();
+    const msgEl = document.getElementById('instructMsg');
+
+    if (!siteId || !message) {
+      msgEl.textContent = '現場と指示内容を入力してください';
+      msgEl.style.color = '#b3261e';
+      return;
+    }
+    msgEl.textContent = '送信中...';
+    msgEl.style.color = '#565d68';
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ type: 'instruct', siteId, siteName, targetWorker, message })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.result === 'ok') {
+        msgEl.textContent = '配信しました';
+        msgEl.style.color = '#1f6f4a';
+        document.getElementById('instructMessage').value = '';
+      } else {
+        msgEl.textContent = '配信に失敗しました：' + (res.message || '');
+        msgEl.style.color = '#b3261e';
+      }
+    })
+    .catch(() => {
+      msgEl.textContent = '通信エラーが発生しました';
+      msgEl.style.color = '#b3261e';
+    });
+  });
 }
 </script>
 </body>
