@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KBL｜現場の進捗状況</title>
+<style>
+  :root{
+    --bg: #f5f4f1;
+    --card: #ffffff;
+    --ink: #1c2027;
+    --ink-soft: #565d68;
+    --line: #e2e0da;
+    --accent: #d9770b;
+    --navy: #1a1a1a;
+    --ok-bg: #e7f3ed; --ok-fg: #1f6f4a;
+    --bad-bg: #fbe9e7; --bad-fg: #b3261e;
+    --neutral-bg: #eceef1; --neutral-fg: #565d68;
+  }
+  * { box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Roboto, sans-serif;
+  }
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:20px 28px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+  }
+  header .title{ font-size:18px; font-weight:600; }
+  header .title .badge{
+    font-size:11px; font-weight:600; color:var(--accent);
+    border:1px solid var(--accent); border-radius:5px;
+    padding:1px 6px; margin-left:8px;
+  }
+  header .date{ font-size:13px; color:#b9c0cd; }
+  main{ padding:24px 28px; max-width:960px; margin:0 auto; }
+  .toolbar{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:14px;
+  }
+  .toolbar button{
+    padding:8px 16px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; font-size:13.5px; font-weight:600; color:var(--ink);
+    cursor:pointer;
+  }
+  table{
+    width:100%; border-collapse:collapse;
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    overflow:hidden;
+  }
+  thead th{
+    text-align:left; font-size:12px; color:var(--ink-soft); font-weight:600;
+    padding:10px 16px; border-bottom:1px solid var(--line); background:#fafaf8;
+  }
+  tbody td{
+    padding:13px 16px; font-size:13.5px; border-bottom:1px solid var(--line);
+    vertical-align:middle;
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  .site-name{ font-weight:600; }
+  .site-id{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .badge{
+    display:inline-block; padding:3px 12px; border-radius:999px;
+    font-size:12px; font-weight:600;
+  }
+  .badge.ok{ background:var(--ok-bg); color:var(--ok-fg); }
+  .badge.bad{ background:var(--bad-bg); color:var(--bad-fg); }
+  .badge.neutral{ background:var(--neutral-bg); color:var(--neutral-fg); }
+  .muted{ color:var(--ink-soft); font-size:12.5px; }
+  #loading, #errorMsg{ padding:40px; text-align:center; color:var(--ink-soft); }
+  #errorMsg{ color:var(--bad-fg); display:none; }
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab-btn{
+    padding:8px 18px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; font-size:13.5px; font-weight:600; color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+  .form-card{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:20px; max-width:520px;
+  }
+  .form-card label{ display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+  .form-card .field{ margin-bottom:16px; }
+  .form-card select, .form-card textarea{
+    width:100%; font-size:14.5px; padding:10px; border:1.5px solid var(--line); border-radius:8px;
+  }
+  .form-card textarea{ min-height:80px; }
+  .form-card button{
+    padding:12px 20px; border-radius:9px; border:none; background:var(--accent);
+    color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;
+  }
+  #instructMsg{ margin-top:10px; font-size:13px; font-weight:600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">SION.J株式会社 <span class="badge" style="background:transparent;">KBL</span></div>
+  <div class="date" id="dateLabel"></div>
+</header>
+
+<main>
+  <div class="tabs">
+    <div class="tab-btn active" data-tab="dashboard">進捗状況</div>
+    <div class="tab-btn" data-tab="instruct">指示配信</div>
+  </div>
+
+  <div class="panel active" id="panel-dashboard">
+  <div class="toolbar">
+    <div class="muted">現場ごとの現在の工程と、計画に対する判定を一覧表示しています</div>
+    <button id="refreshBtn">更新</button>
+  </div>
+
+  <div id="loading">読み込み中...</div>
+  <div id="errorMsg">現場一覧の取得に失敗しました</div>
+  <table id="table" style="display:none;">
+    <thead>
+      <tr>
+        <th>現場</th>
+        <th>現在の工程</th>
+        <th>次の予定</th>
+        <th>判定</th>
+        <th>最終報告</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  </div>
+
+  <div class="panel" id="panel-instruct">
+    <div class="form-card">
+      <div class="field">
+        <label>現場</label>
+        <select id="instructSite"></select>
+      </div>
+      <div class="field">
+        <label>対象</label>
+        <select id="instructTarget">
+          <option value="all">全員</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>指示内容</label>
+        <textarea id="instructMessage" placeholder="例：明日は9時から2階の配線作業をお願いします"></textarea>
+      </div>
+      <button id="instructSendBtn">この内容を配信する</button>
+      <div id="instructMsg"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyuABcVJ-tPZZc9NIKWx_PrxY4X-SkHdoR4taTJDPKSDc2wqGPjwADnp8TBfatkzqaNfg/exec";
+
+document.getElementById('dateLabel').textContent =
+  new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+function judgementBadge(j){
+  if(j === '順調') return '<span class="badge ok">順調</span>';
+  if(j === '遅れ') return '<span class="badge bad">遅れ</span>';
+  return '<span class="badge neutral">未判定</span>';
+}
+
+function load(){
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('errorMsg').style.display = 'none';
+  document.getElementById('table').style.display = 'none';
+
+  fetch(GAS_URL + '?action=dashboard')
+    .then(r => r.json())
+    .then(data => {
+      const sites = data.sites || [];
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      sites.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="site-name">${s.siteName}</div>
+            <div class="site-id">${s.siteId}</div>
+          </td>
+          <td>${s.currentStageName}</td>
+          <td>${s.nextMilestoneName ? s.nextMilestoneName + ' ' + s.nextMilestoneDate : '<span class="muted">-</span>'}</td>
+          <td>${judgementBadge(s.judgement)}</td>
+          <td class="muted">${s.lastReporter ? s.lastReporter + '　' + s.lastUpdated : '未報告'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('table').style.display = 'table';
+    })
+    .catch(() => {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMsg').style.display = 'block';
+    });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', load);
+load();
+
+// ==== タブ切替 ====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ==== 指示配信 ====
+const instructTarget = document.getElementById('instructTarget');
+fetch(GAS_URL + '?action=workers')
+  .then(r => r.json())
+  .then(data => {
+    (data.workers || []).forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w; opt.textContent = w;
+      instructTarget.appendChild(opt);
+    });
+  });
+
+const instructSite = document.getElementById('instructSite');
+fetch(GAS_URL + '?action=sites')
+  .then(r => r.json())
+  .then(data => {
+    (data.sites || []).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id; opt.dataset.name = s.name; opt.textContent = s.name;
+      instructSite.appendChild(opt);
+    });
+  });
+
+document.getElementById('instructSendBtn').addEventListener('click', () => {
+  const siteOpt = instructSite.options[instructSite.selectedIndex];
+  const siteId = instructSite.value;
+  const siteName = siteOpt ? siteOpt.textContent : '';
+  const targetWorker = instructTarget.value;
+  const message = document.getElementById('instructMessage').value.trim();
+  const msgEl = document.getElementById('instructMsg');
+
+  if (!siteId || !message) {
+    msgEl.textContent = '現場と指示内容を入力してください';
+    msgEl.style.color = '#b3261e';
+    return;
+  }
+
+  msgEl.textContent = '送信中...';
+  msgEl.style.color = '#565d68';
+
+  fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ type: 'instruct', siteId, siteName, targetWorker, message })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.result === 'ok') {
+      msgEl.textContent = '配信しました';
+      msgEl.style.color = '#1f6f4a';
+      document.getElementById('instructMessage').value = '';
+    } else {
+      msgEl.textContent = '配信に失敗しました：' + (res.message || '');
+      msgEl.style.color = '#b3261e';
+    }
+  })
+  .catch(() => {
+    msgEl.textContent = '通信エラーが発生しました';
+    msgEl.style.color = '#b3261e';
+  });
+});
+</script>
+</body>
+</html>

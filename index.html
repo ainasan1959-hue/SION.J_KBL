@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1a1a">
 <title>KBL｜SION.J株式会社</title>
 <style>
   :root{
@@ -245,9 +247,48 @@
 // ==== 設定：GASのWebアプリURLに差し替えてください ====
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyuABcVJ-tPZZc9NIKWx_PrxY4X-SkHdoR4taTJDPKSDc2wqGPjwADnp8TBfatkzqaNfg/exec";
 
-// PoC用の初期マスタ（本運用では現場マスタシートから doGet で取得する形に拡張可）
-const WORKERS = ["山田", "鈴木", "佐藤", "田中"]; // 仮：友人会社の職人名に差し替え
-let SITES = []; // 現場マスタから取得予定。取得失敗時は空欄で手入力不可の旨を表示
+// ==== プッシュ通知設定（Cloudflare Workerデプロイ後に書き換える） ====
+const PUSH_WORKER_URL = "★ここにCloudflare WorkerのURLを貼る（例: https://kbl-push.xxxx.workers.dev）★";
+const VAPID_PUBLIC_KEY = "BAXKJwcvLvHDgNmajXGtnaDXA0Nf2I5BfOdMA4CVCXCOZfL9xSs9HSG2I-IL9WHp2G08aJKkj-NwhhDXRwyKjRk";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function setupPush(workerName) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!PUSH_WORKER_URL || PUSH_WORKER_URL.indexOf('★') !== -1) return; // 未設定なら何もしない
+
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    await fetch(PUSH_WORKER_URL + '/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ worker: workerName, subscription: sub })
+    });
+  } catch (err) {
+    console.warn('push setup failed', err);
+  }
+}
+
+// 現場・職人はいずれもスプレッドシートのマスタから取得する
+let SITES = [];
 
 let selectedStage = null; // { number, name }
 let photos = []; // {name, base64}
@@ -256,12 +297,28 @@ const todayLabel = document.getElementById('todayLabel');
 const now = new Date();
 todayLabel.textContent = '電工日報　' + now.toLocaleDateString('ja-JP', { month:'long', day:'numeric', weekday:'short' });
 
-// 職人名プルダウン生成
+// 職人名プルダウン生成（職人マスタシートから取得）
 const workerSelect = document.getElementById('workerSelect');
-WORKERS.forEach(w => {
-  const opt = document.createElement('option');
-  opt.value = w; opt.textContent = w;
-  workerSelect.appendChild(opt);
+function loadWorkers(){
+  workerSelect.innerHTML = '<option value="">読み込み中...</option>';
+  fetch(GAS_URL + '?action=workers')
+    .then(r => r.json())
+    .then(data => {
+      const workers = data.workers || [];
+      workerSelect.innerHTML = '<option value="">選択してください</option>';
+      workers.forEach(w => {
+        const opt = document.createElement('option');
+        opt.value = w; opt.textContent = w;
+        workerSelect.appendChild(opt);
+      });
+    })
+    .catch(() => {
+      workerSelect.innerHTML = '<option value="">職人一覧の取得に失敗しました</option>';
+    });
+}
+loadWorkers();
+workerSelect.addEventListener('change', () => {
+  if (workerSelect.value) setupPush(workerSelect.value);
 });
 
 // 現場マスタ取得（GASのdoGetから）
