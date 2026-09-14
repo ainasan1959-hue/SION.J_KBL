@@ -99,9 +99,50 @@
     color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;
   }
   #instructMsg{ margin-top:10px; font-size:13px; font-weight:600; }
+
+  /* ログインゲート */
+  #loginGate{
+    position:fixed; inset:0; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    z-index:100;
+  }
+  #loginGate .box{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:32px 28px; width:280px; text-align:center;
+  }
+  #loginGate .box .lock{ font-size:28px; margin-bottom:10px; }
+  #loginGate .box h2{ font-size:15px; margin:0 0 18px; }
+  #loginGate input{
+    width:100%; font-size:15px; padding:10px; border:1.5px solid var(--line);
+    border-radius:8px; text-align:center; margin-bottom:10px;
+  }
+  #loginGate button{
+    width:100%; padding:11px; border:none; border-radius:9px;
+    background:var(--navy); color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  #loginGate .err{ color:var(--bad-fg); font-size:12.5px; margin-top:8px; min-height:16px; }
+  #appBody{ display:none; }
 </style>
 </head>
 <body>
+
+<div id="loginGate">
+  <div class="box">
+    <div class="lock">🔒</div>
+    <h2>KBL 管理画面<br>合言葉を入力してください</h2>
+    <input type="password" id="gatePassword" placeholder="合言葉">
+    <button id="gateBtn">開く</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<div id="roleSelector" style="display:none; position:fixed; inset:0; background:var(--bg); align-items:center; justify-content:center; z-index:90; flex-direction:column; gap:14px;">
+  <div style="font-size:15px; font-weight:700; margin-bottom:6px;">どちらを開きますか？</div>
+  <button id="goReportBtn" style="width:240px; padding:16px; border:none; border-radius:12px; background:var(--accent); color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;">日報を入力する</button>
+  <button id="goAdminBtn" style="width:240px; padding:16px; border:none; border-radius:12px; background:var(--navy); color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;">管理者パネルを開く</button>
+</div>
+
+<div id="appBody">
 
 <header>
   <div class="title">SION.J株式会社 <span class="badge" style="background:transparent;">KBL</span></div>
@@ -157,9 +198,39 @@
     </div>
   </div>
 </main>
+</div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyuABcVJ-tPZZc9NIKWx_PrxY4X-SkHdoR4taTJDPKSDc2wqGPjwADnp8TBfatkzqaNfg/exec";
+
+// ==== 合言葉ログイン ====
+const CEO_PASSWORD = "sionj-ceo2026"; // 必要に応じて変更してください
+if (sessionStorage.getItem('kbl_admin_ok') === '1') {
+  document.getElementById('loginGate').style.display = 'none';
+  document.getElementById('roleSelector').style.display = 'flex';
+}
+document.getElementById('gateBtn').addEventListener('click', checkGate);
+document.getElementById('gatePassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') checkGate();
+});
+function checkGate() {
+  const input = document.getElementById('gatePassword').value;
+  if (input === CEO_PASSWORD) {
+    sessionStorage.setItem('kbl_admin_ok', '1');
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('roleSelector').style.display = 'flex';
+  } else {
+    document.getElementById('gateErr').textContent = '合言葉が違います';
+  }
+}
+
+document.getElementById('goReportBtn').addEventListener('click', () => {
+  location.href = 'index.html';
+});
+document.getElementById('goAdminBtn').addEventListener('click', () => {
+  document.getElementById('roleSelector').style.display = 'none';
+  document.getElementById('appBody').style.display = 'block';
+});
 
 document.getElementById('dateLabel').textContent =
   new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
