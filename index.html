@@ -273,10 +273,19 @@
       <div class="tab-btn active" data-wtab="report">日報</div>
       <div class="tab-btn" data-wtab="instructions">指示</div>
       <div class="tab-btn" data-wtab="progress">進捗</div>
+      <a href="kotei.html" target="_blank" class="tab-btn" style="text-decoration:none; display:inline-block;">工程表 ↗</a>
     </div>
 
     <div id="wpanel-progress" class="panel">
       <div class="back-link" data-backto="report">← 日報にもどる</div>
+      <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+        <a href="https://calendar.google.com/calendar/u/0/r?cid=a5c79a05d0893095e3a451ac70c9fa09ce3b4013c8c3fd82161d43816b304beb%40group.calendar.google.com" target="_blank" style="text-decoration:none;">
+          <button type="button" style="padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer;">📅 計画カレンダー</button>
+        </a>
+        <a href="https://calendar.google.com/calendar/u/0/r?cid=62aa16be36b04efff547100121ebcc859cff17cff43b684fe3aa2a6e7259c3a7%40group.calendar.google.com" target="_blank" style="text-decoration:none;">
+          <button type="button" style="padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer;">📅 実績カレンダー</button>
+        </a>
+      </div>
       <div id="progressList"><div class="hint">読み込み中...</div></div>
     </div>
 
@@ -496,7 +505,7 @@ todayLabel.textContent = '電工日報　' + now.toLocaleDateString('ja-JP', { m
 
 let VALID_WORKERS = [];
 function loadWorkers(){
-  fetch(GAS_URL + '?action=workers')
+  fetch(GAS_URL + '?action=workers', { cache: 'no-store' })
     .then(r => r.json())
     .then(data => { VALID_WORKERS = data.workers || []; })
     .catch(() => { VALID_WORKERS = []; });
@@ -538,7 +547,7 @@ function checkWorkerName(){
 
 function loadInstructions(worker){
   instructionsList.innerHTML = '<div class="hint">読み込み中...</div>';
-  fetch(GAS_URL + '?action=instructions&worker=' + encodeURIComponent(worker))
+  fetch(GAS_URL + '?action=instructions&worker=' + encodeURIComponent(worker), { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
       const list = data.instructions || [];
@@ -559,13 +568,13 @@ function loadInstructions(worker){
 }
 
 function switchWorkerTab(name){
-  document.querySelectorAll('#workerTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.wtab === name));
+  document.querySelectorAll('#workerTabs .tab-btn[data-wtab]').forEach(b => b.classList.toggle('active', b.dataset.wtab === name));
   document.querySelectorAll('#wpanel-report, #wpanel-instructions, #wpanel-progress').forEach(p => p.classList.remove('active'));
   document.getElementById('wpanel-' + name).classList.add('active');
   document.getElementById('submitBar').style.display = (name === 'report') ? 'block' : 'none';
   if (name === 'progress') loadProgress();
 }
-document.querySelectorAll('#workerTabs .tab-btn').forEach(btn => {
+document.querySelectorAll('#workerTabs .tab-btn[data-wtab]').forEach(btn => {
   btn.addEventListener('click', () => switchWorkerTab(btn.dataset.wtab));
 });
 document.querySelectorAll('#wpanel-instructions .back-link, #wpanel-progress .back-link').forEach(link => {
@@ -585,7 +594,7 @@ function overallStatusBadge(currentStageNumber, totalMilestones){
 }
 function loadProgress(){
   progressList.innerHTML = '<div class="hint">読み込み中...</div>';
-  fetch(GAS_URL + '?action=gantt')
+  fetch(GAS_URL + '?action=gantt', { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
       const sites = data.sites || [];
@@ -636,7 +645,7 @@ function loadProgress(){
 const siteSelect = document.getElementById('siteSelect');
 function loadSites(){
   siteSelect.innerHTML = '<option value="">読み込み中...</option>';
-  fetch(GAS_URL + '?action=sites')
+  fetch(GAS_URL + '?action=sites', { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
       SITES = data.sites || [];
@@ -668,7 +677,7 @@ siteSelect.addEventListener('change', () => {
     return;
   }
   statusGroup.innerHTML = '<div class="hint">工程を読み込み中...</div>';
-  fetch(GAS_URL + '?action=milestones&siteId=' + encodeURIComponent(siteId))
+  fetch(GAS_URL + '?action=milestones&siteId=' + encodeURIComponent(siteId), { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
       const milestones = data.milestones || [];
@@ -849,7 +858,7 @@ function initAdmin(){
     document.getElementById('errorMsgAdmin').style.display = 'none';
     document.getElementById('table').style.display = 'none';
 
-    fetch(GAS_URL + '?action=dashboard')
+    fetch(GAS_URL + '?action=dashboard', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         const sites = data.sites || [];
@@ -902,7 +911,7 @@ function initAdmin(){
     const tbody = document.getElementById('assignTbody');
     loading.style.display = 'block';
     table.style.display = 'none';
-    fetch(GAS_URL + '?action=todayAssignment')
+    fetch(GAS_URL + '?action=todayAssignment', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         const list = data.assignments || [];
@@ -927,7 +936,7 @@ function initAdmin(){
     const logList = document.getElementById('logList');
     logLoading.style.display = 'block';
     logList.innerHTML = '';
-    fetch(GAS_URL + '?action=instructionLog')
+    fetch(GAS_URL + '?action=instructionLog', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         const groups = data.log || [];
@@ -955,7 +964,7 @@ function initAdmin(){
   }
 
   const instructTarget = document.getElementById('instructTarget');
-  fetch(GAS_URL + '?action=workers')
+  fetch(GAS_URL + '?action=workers', { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
       (data.workers || []).forEach(w => {
@@ -966,7 +975,7 @@ function initAdmin(){
     });
 
   const instructSite = document.getElementById('instructSite');
-  fetch(GAS_URL + '?action=sites')
+  fetch(GAS_URL + '?action=sites', { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
       (data.sites || []).forEach(s => {
