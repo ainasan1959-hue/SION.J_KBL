@@ -457,9 +457,9 @@
           <select id="importSite"></select>
         </div>
         <div class="field">
-          <label>Excelから貼り付け（工程名・終了予定日の2列を選択してコピー）</label>
-          <textarea id="importText" style="min-height:140px; font-family:monospace; font-size:12.5px;" placeholder="現場調査&#9;2026-10-15&#10;提出・承認&#9;2026-10-26&#10;（Excelでこの2列を範囲選択してコピーし、ここに貼り付けてください）"></textarea>
-          <div class="hint">1行に「工程名」「終了予定日」をタブ区切りで。Excelで2列を選択してそのままコピペすればOKです。既存の工程の続き番号から追加されます。</div>
+          <label>Excelから貼り付け（工程名・開始日・終了予定日の3列を選択してコピー）</label>
+          <textarea id="importText" style="min-height:140px; font-family:monospace; font-size:12.5px;" placeholder="現場調査&#9;2026-10-01&#9;2026-10-15&#10;提出・承認&#9;2026-10-15&#9;2026-10-26&#10;（Excelでこの3列を範囲選択してコピーし、ここに貼り付けてください）"></textarea>
+          <div class="hint">1行に「工程名」「開始日」「終了予定日」をタブ区切りで。Excelで3列を選択してそのままコピペすればOKです。既存の工程の続き番号から追加されます。</div>
         </div>
         <div id="importPreview"></div>
         <button id="importBtn">この内容を取り込む</button>
@@ -630,7 +630,7 @@ function renderProgressCards(sites){
         <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12.5px;">
           <span style="color:${color}; font-weight:700; width:14px; text-align:center;">${icon}</span>
           <span style="color:${color === 'var(--ink-soft)' ? 'var(--ink-soft)' : 'var(--ink)'};">${m.name}</span>
-          <span style="margin-left:auto; color:var(--ink-soft); font-size:11.5px;">${m.plannedDate || ''}</span>
+          <span style="margin-left:auto; color:var(--ink-soft); font-size:11.5px;">${m.startDate || ''}${m.startDate && m.endDate ? ' 〜 ' : ''}${m.endDate || ''}</span>
         </div>
       `;
     }).join('');
@@ -641,7 +641,7 @@ function renderProgressCards(sites){
           <div style="font-weight:700; font-size:14.5px;">${s.siteName}</div>
           <div style="display:flex; gap:6px;">${overallStatusBadge(s.currentStageNumber, total)}${judgementBadgeSmall(s.judgement)}</div>
         </div>
-        ${nextMilestone ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">次の予定：${nextMilestone.name}　${nextMilestone.plannedDate || ''}</div>` : ''}
+        ${nextMilestone ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">次の予定：${nextMilestone.name}　${nextMilestone.startDate || ''} 〜 ${nextMilestone.endDate || ''}</div>` : ''}
         ${milestoneRows ? `<div style="border-top:1px solid var(--line); padding-top:6px;">${milestoneRows}</div>` : ''}
       </div>
     `;
@@ -922,9 +922,9 @@ function initAdmin(){
       .filter(line => line.length > 0)
       .map(line => {
         const cols = line.split('\t').map(c => c.trim());
-        return { name: cols[0] || '', endDate: cols[1] || '' };
+        return { name: cols[0] || '', startDate: cols[1] || '', endDate: cols[2] || '' };
       })
-      .filter(row => row.name && row.endDate);
+      .filter(row => row.name && row.startDate && row.endDate);
   }
 
   document.getElementById('importText').addEventListener('input', () => {
@@ -932,7 +932,7 @@ function initAdmin(){
     const preview = document.getElementById('importPreview');
     if (rows.length === 0) { preview.innerHTML = ''; return; }
     preview.innerHTML = '<div class="hint" style="margin:10px 0 4px;">' + rows.length + '件を検出：</div>' +
-      rows.map(r => `<div style="font-size:12.5px; padding:2px 0;">・${r.name}　${r.endDate}</div>`).join('');
+      rows.map(r => `<div style="font-size:12.5px; padding:2px 0;">・${r.name}　${r.startDate} 〜 ${r.endDate}</div>`).join('');
   });
 
   document.getElementById('importBtn').addEventListener('click', () => {
