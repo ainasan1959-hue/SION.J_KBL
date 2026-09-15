@@ -473,9 +473,18 @@
           <select id="importSite"></select>
         </div>
         <div class="field">
-          <label>PDFから読み込む（文字ベースの表形式のみ対応）</label>
+          <label>PDFから読み込む</label>
           <input type="file" id="importPdf" accept="application/pdf">
-          <div class="hint">「工程名・開始日・終了日」が横に並ぶ、文字の表になっているPDFに対応しています。バーで期間を表すガントチャート形式のPDFは読み取れません。</div>
+          <div class="status-group" style="margin-top:8px;">
+            <div class="status-btn active" id="modeText" data-mode="text">文字の表を読む（無料）</div>
+            <div class="status-btn" id="modeAi" data-mode="ai">AIでガントチャートを読む</div>
+          </div>
+          <div class="hint">「文字の表」は工程名・開始日・終了日が横に並ぶ表形式PDF向け（無料・即時）。「AIで読む」はバーで期間を表すガントチャート形式にも対応しますが、Claude APIを呼び出すため少額の利用料がかかります。</div>
+        </div>
+        <div class="field" id="aiPromptField" style="display:none;">
+          <label>AIへの指示（プロンプト・編集できます）</label>
+          <textarea id="aiPromptText" style="min-height:110px; font-size:12.5px;"></textarea>
+          <div class="hint">工事区分の扱い方や、工程のまとめ方などを自由に書き換えられます。空欄のまま実行すると、この初期値がそのまま使われます。</div>
         </div>
         <div class="field">
           <label>またはExcelから貼り付け（工程名・開始日・終了予定日の3列を選択してコピー）</label>
@@ -1056,18 +1065,88 @@ function initAdmin(){
     return rows;
   }
 
+  const DEFAULT_AI_PROMPT = "これは建設工事のガントチャート（工程表）です。工事が①②③のように複数の工事区分に分かれている場合は、区分名を工程名の先頭に「区分名｜工程名」の形で含めてください（例：「①仮設発電機切替盤設置工事｜現場調査・提出・承認」）。連続する細かい工程は、ある程度まとめて構いません（例えば「現場調査」と「提出・承認」が連続していれば1つの工程としてまとめてよい）。各工程について、工程名・開始日・終了日を読み取り、以下のJSON配列の形式だけで出力してください。説明文や前置きは一切不要です。日付はYYYY-MM-DD形式にしてください（年が読み取れない場合は表内の年の記載から推測してください）。\n[{\"name\": \"工程名\", \"startDate\": \"YYYY-MM-DD\", \"endDate\": \"YYYY-MM-DD\"}]";
+
+  let importMode = 'text';
+  document.querySelectorAll('#panel-import .status-group .status-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#panel-import .status-group .status-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      importMode = btn.dataset.mode;
+      const promptField = document.getElementById('aiPromptField');
+      promptField.style.display = (importMode === 'ai') ? 'block' : 'none';
+      if (importMode === 'ai' && !document.getElementById('aiPromptText').value) {
+        document.getElementById('aiPromptText').value = DEFAULT_AI_PROMPT;
+      }
+    });
+  });
+
+  // PDFの各ページをPNG画像（base64）に変換する
+  async function extractPdfPageImages(file){
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const images = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const dataUrl = canvas.toDataURL('image/png');
+      images.push(dataUrl.split(',')[1]);
+    }
+    return images;
+  }
+
   document.getElementById('importPdf').addEventListener('change', async () => {
     const file = document.getElementById('importPdf').files[0];
     if (!file) return;
     const msgEl = document.getElementById('importMsg');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    if (importMode === 'ai') {
+      msgEl.textContent = 'PDFを画像化してAIに解析させています...（数十秒かかることがあります）';
+      msgEl.style.color = '#565d68';
+      try {
+        const images = await extractPdfPageImages(file);
+        const prompt = document.getElementById('aiPromptText').value.trim() || DEFAULT_AI_PROMPT;
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ type: 'analyzeGanttImages', images, prompt })
+        }).then(r => r.json());
+
+        if (res.result !== 'ok') {
+          msgEl.textContent = 'AI解析に失敗しました：' + (res.message || '');
+          msgEl.style.color = '#b3261e';
+          return;
+        }
+        const rows = (res.rows || []).filter(r => r.name && r.startDate && r.endDate);
+        if (rows.length === 0) {
+          msgEl.textContent = 'AIが工程を読み取れませんでした';
+          msgEl.style.color = '#b3261e';
+          return;
+        }
+        const textarea = document.getElementById('importText');
+        textarea.value = rows.map(r => `${r.name}\t${r.startDate}\t${r.endDate}`).join('\n');
+        textarea.dispatchEvent(new Event('input'));
+        msgEl.textContent = 'AIが' + rows.length + '件読み取りました。内容を必ず確認・修正してから取り込んでください';
+        msgEl.style.color = '#1f6f4a';
+      } catch (err) {
+        msgEl.textContent = 'AI解析でエラーが発生しました';
+        msgEl.style.color = '#b3261e';
+      }
+      return;
+    }
+
     msgEl.textContent = 'PDFを読み込み中...';
     msgEl.style.color = '#565d68';
     try {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       const lines = await extractPdfLines(file);
       const rows = pdfLinesToRows(lines);
       if (rows.length === 0) {
-        msgEl.textContent = 'このPDFからは工程を読み取れませんでした（文字ベースの表形式のみ対応しています）';
+        msgEl.textContent = 'このPDFからは工程を読み取れませんでした（文字ベースの表形式のみ対応しています。ガントチャート形式は「AIでガントチャートを読む」をお試しください）';
         msgEl.style.color = '#b3261e';
         return;
       }
