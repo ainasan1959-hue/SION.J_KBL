@@ -371,6 +371,7 @@
       <div class="tab-btn active" data-tab="dashboard">進捗状況</div>
       <div class="tab-btn" data-tab="instruct">指示配信</div>
       <div class="tab-btn" data-tab="log">指示履歴</div>
+      <div class="tab-btn" data-tab="assign">人員配置</div>
     </div>
 
     <div class="panel active" id="panel-dashboard">
@@ -417,6 +418,18 @@
       <div class="muted" style="margin:10px 0 14px;">これまでに配信した指示を、案件（現場）ごとにまとめています</div>
       <div id="logLoading" class="hint">読み込み中...</div>
       <div id="logList"></div>
+    </div>
+
+    <div class="panel" id="panel-assign">
+      <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
+      <div class="muted" style="margin:10px 0 14px;">今日、日報が送られた実績をもとに、誰がどの現場にいたかを表示しています</div>
+      <div id="assignLoading" class="hint">読み込み中...</div>
+      <table id="assignTable" style="display:none;">
+        <thead>
+          <tr><th>職人</th><th>現場</th><th>工程</th><th>時刻</th></tr>
+        </thead>
+        <tbody id="assignTbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -811,18 +824,46 @@ function initAdmin(){
   loadDashboard();
 
   let logLoaded = false;
+  let assignLoaded = false;
   function switchAdminTab(name){
     document.querySelectorAll('#adminMain .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('#adminMain .panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     if (name === 'log' && !logLoaded) { loadInstructionLog(); logLoaded = true; }
+    if (name === 'assign' && !assignLoaded) { loadTodayAssignment(); assignLoaded = true; }
   }
   document.querySelectorAll('#adminMain .tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchAdminTab(btn.dataset.tab));
   });
-  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link').forEach(link => {
+  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link, #panel-assign .back-link').forEach(link => {
     link.addEventListener('click', () => switchAdminTab(link.dataset.backto));
   });
+
+  function loadTodayAssignment(){
+    const loading = document.getElementById('assignLoading');
+    const table = document.getElementById('assignTable');
+    const tbody = document.getElementById('assignTbody');
+    loading.style.display = 'block';
+    table.style.display = 'none';
+    fetch(GAS_URL + '?action=todayAssignment')
+      .then(r => r.json())
+      .then(data => {
+        const list = data.assignments || [];
+        tbody.innerHTML = list.map(a => `
+          <tr>
+            <td>${a.worker}</td>
+            <td>${a.reported ? a.siteName : '<span class="muted">未報告</span>'}</td>
+            <td>${a.reported ? a.stageName : '-'}</td>
+            <td class="muted">${a.reported ? a.time : '-'}</td>
+          </tr>
+        `).join('');
+        loading.style.display = 'none';
+        table.style.display = 'table';
+      })
+      .catch(() => {
+        loading.textContent = '人員配置の取得に失敗しました';
+      });
+  }
 
   function loadInstructionLog(){
     const logLoading = document.getElementById('logLoading');
