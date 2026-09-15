@@ -387,6 +387,7 @@
       <div class="tab-btn" data-tab="instruct">指示配信</div>
       <div class="tab-btn" data-tab="log">指示履歴</div>
       <div class="tab-btn" data-tab="assign">人員配置</div>
+      <div class="tab-btn" data-tab="import">工程一括登録</div>
     </div>
 
     <div class="panel active" id="panel-dashboard">
@@ -446,6 +447,24 @@
         </thead>
         <tbody id="assignTbody"></tbody>
       </table>
+    </div>
+
+    <div class="panel" id="panel-import">
+      <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
+      <div class="form-card">
+        <div class="field">
+          <label>登録先の現場</label>
+          <select id="importSite"></select>
+        </div>
+        <div class="field">
+          <label>Excelから貼り付け（工程名・終了予定日の2列を選択してコピー）</label>
+          <textarea id="importText" style="min-height:140px; font-family:monospace; font-size:12.5px;" placeholder="現場調査&#9;2026-10-15&#10;提出・承認&#9;2026-10-26&#10;（Excelでこの2列を範囲選択してコピーし、ここに貼り付けてください）"></textarea>
+          <div class="hint">1行に「工程名」「終了予定日」をタブ区切りで。Excelで2列を選択してそのままコピペすればOKです。既存の工程の続き番号から追加されます。</div>
+        </div>
+        <div id="importPreview"></div>
+        <button id="importBtn">この内容を取り込む</button>
+        <div id="importMsg"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -867,18 +886,87 @@ function initAdmin(){
 
   let logLoaded = false;
   let assignLoaded = false;
+  let importLoaded = false;
   function switchAdminTab(name){
     document.querySelectorAll('#adminMain .tab-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('#adminMain .panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     if (name === 'log' && !logLoaded) { loadInstructionLog(); logLoaded = true; }
     if (name === 'assign' && !assignLoaded) { loadTodayAssignment(); assignLoaded = true; }
+    if (name === 'import' && !importLoaded) { loadImportSites(); importLoaded = true; }
   }
   document.querySelectorAll('#adminMain .tab-btn[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchAdminTab(btn.dataset.tab));
   });
-  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link, #panel-assign .back-link').forEach(link => {
+  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link, #panel-assign .back-link, #panel-import .back-link').forEach(link => {
     link.addEventListener('click', () => switchAdminTab(link.dataset.backto));
+  });
+
+  function loadImportSites(){
+    const importSite = document.getElementById('importSite');
+    fetch(GAS_URL + '?action=sites', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => {
+        importSite.innerHTML = '';
+        (data.sites || []).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = s.name;
+          importSite.appendChild(opt);
+        });
+      });
+  }
+
+  function parseImportText(text){
+    return text.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => {
+        const cols = line.split('\t').map(c => c.trim());
+        return { name: cols[0] || '', endDate: cols[1] || '' };
+      })
+      .filter(row => row.name && row.endDate);
+  }
+
+  document.getElementById('importText').addEventListener('input', () => {
+    const rows = parseImportText(document.getElementById('importText').value);
+    const preview = document.getElementById('importPreview');
+    if (rows.length === 0) { preview.innerHTML = ''; return; }
+    preview.innerHTML = '<div class="hint" style="margin:10px 0 4px;">' + rows.length + '件を検出：</div>' +
+      rows.map(r => `<div style="font-size:12.5px; padding:2px 0;">・${r.name}　${r.endDate}</div>`).join('');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    const siteId = document.getElementById('importSite').value;
+    const rows = parseImportText(document.getElementById('importText').value);
+    const msgEl = document.getElementById('importMsg');
+
+    if (!siteId) { msgEl.textContent = '現場を選択してください'; msgEl.style.color = '#b3261e'; return; }
+    if (rows.length === 0) { msgEl.textContent = '貼り付け内容から工程が読み取れませんでした'; msgEl.style.color = '#b3261e'; return; }
+
+    msgEl.textContent = '取り込み中...';
+    msgEl.style.color = '#565d68';
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ type: 'importMilestones', siteId, rows })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.result === 'ok') {
+        msgEl.textContent = res.added + '件、工程マスタに追加しました';
+        msgEl.style.color = '#1f6f4a';
+        document.getElementById('importText').value = '';
+        document.getElementById('importPreview').innerHTML = '';
+      } else {
+        msgEl.textContent = '取り込みに失敗しました：' + (res.message || '');
+        msgEl.style.color = '#b3261e';
+      }
+    })
+    .catch(() => {
+      msgEl.textContent = '通信エラーが発生しました';
+      msgEl.style.color = '#b3261e';
+    });
   });
 
   function loadTodayAssignment(){
