@@ -273,7 +273,6 @@
       <div class="tab-btn active" data-wtab="report">日報</div>
       <div class="tab-btn" data-wtab="instructions">指示</div>
       <div class="tab-btn" data-wtab="progress">進捗</div>
-      <a href="kotei.html" target="_blank" class="tab-btn" style="text-decoration:none; display:inline-block;">工程表 ↗</a>
     </div>
 
     <div id="wpanel-progress" class="panel">
@@ -388,24 +387,16 @@
       <div class="tab-btn" data-tab="instruct">指示配信</div>
       <div class="tab-btn" data-tab="log">指示履歴</div>
       <div class="tab-btn" data-tab="assign">人員配置</div>
-      <a href="kotei.html" target="_blank" class="tab-btn" style="text-decoration:none; display:inline-block;">工程表 ↗</a>
     </div>
 
     <div class="panel active" id="panel-dashboard">
       <div class="toolbar">
-        <div class="muted">現場ごとの現在の工程と、計画に対する判定を一覧表示しています</div>
+        <div class="muted">現場ごとの工程状況を一覧表示しています</div>
         <button id="refreshBtn">更新</button>
       </div>
       <div id="loading">読み込み中...</div>
       <div id="errorMsgAdmin">現場一覧の取得に失敗しました</div>
-      <table id="table" style="display:none;">
-        <thead>
-          <tr>
-            <th>現場</th><th>現在の工程</th><th>次の予定</th><th>判定</th><th>最終報告</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+      <div id="dashboardList" style="display:none;"></div>
     </div>
 
     <div class="panel" id="panel-instruct">
@@ -592,50 +583,49 @@ function overallStatusBadge(currentStageNumber, totalMilestones){
   if (totalMilestones && currentStageNumber >= totalMilestones) return '<span class="badge ok">完了</span>';
   return '<span class="badge neutral">継続中</span>';
 }
+function renderProgressCards(sites){
+  if (sites.length === 0) return '<div class="hint">現場が登録されていません</div>';
+  return sites.map(s => {
+    const milestones = s.milestones || [];
+    const total = milestones.length ? milestones[milestones.length - 1].number : 0;
+    const nextMilestone = milestones.find(m => m.number > s.currentStageNumber);
+
+    const milestoneRows = milestones.map(m => {
+      let icon, color;
+      if (m.number < s.currentStageNumber || (m.number === s.currentStageNumber && s.currentStageNumber >= total)) {
+        icon = '✓'; color = 'var(--ok-fg)';
+      } else if (m.number === s.currentStageNumber) {
+        icon = '▶'; color = 'var(--accent)';
+      } else {
+        icon = '○'; color = 'var(--ink-soft)';
+      }
+      return `
+        <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12.5px;">
+          <span style="color:${color}; font-weight:700; width:14px; text-align:center;">${icon}</span>
+          <span style="color:${color === 'var(--ink-soft)' ? 'var(--ink-soft)' : 'var(--ink)'};">${m.name}</span>
+          <span style="margin-left:auto; color:var(--ink-soft); font-size:11.5px;">${m.plannedDate || ''}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+          <div style="font-weight:700; font-size:14.5px;">${s.siteName}</div>
+          <div style="display:flex; gap:6px;">${overallStatusBadge(s.currentStageNumber, total)}${judgementBadgeSmall(s.judgement)}</div>
+        </div>
+        ${nextMilestone ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">次の予定：${nextMilestone.name}　${nextMilestone.plannedDate || ''}</div>` : ''}
+        ${milestoneRows ? `<div style="border-top:1px solid var(--line); padding-top:6px;">${milestoneRows}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
 function loadProgress(){
   progressList.innerHTML = '<div class="hint">読み込み中...</div>';
   fetch(GAS_URL + '?action=gantt', { cache: 'no-store' })
     .then(r => r.json())
     .then(data => {
-      const sites = data.sites || [];
-      if (sites.length === 0) {
-        progressList.innerHTML = '<div class="hint">現場が登録されていません</div>';
-        return;
-      }
-      progressList.innerHTML = sites.map(s => {
-        const milestones = s.milestones || [];
-        const total = milestones.length ? milestones[milestones.length - 1].number : 0;
-        const nextMilestone = milestones.find(m => m.number > s.currentStageNumber);
-
-        const milestoneRows = milestones.map(m => {
-          let icon, color;
-          if (m.number < s.currentStageNumber || (m.number === s.currentStageNumber && s.currentStageNumber >= total)) {
-            icon = '✓'; color = 'var(--ok-fg)';
-          } else if (m.number === s.currentStageNumber) {
-            icon = '▶'; color = 'var(--accent)';
-          } else {
-            icon = '○'; color = 'var(--ink-soft)';
-          }
-          return `
-            <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12.5px;">
-              <span style="color:${color}; font-weight:700; width:14px; text-align:center;">${icon}</span>
-              <span style="color:${color === 'var(--ink-soft)' ? 'var(--ink-soft)' : 'var(--ink)'};">${m.name}</span>
-              <span style="margin-left:auto; color:var(--ink-soft); font-size:11.5px;">${m.plannedDate || ''}</span>
-            </div>
-          `;
-        }).join('');
-
-        return `
-        <div class="card" style="margin-bottom:10px;">
-          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-            <div style="font-weight:700; font-size:14.5px;">${s.siteName}</div>
-            <div style="display:flex; gap:6px;">${overallStatusBadge(s.currentStageNumber, total)}${judgementBadgeSmall(s.judgement)}</div>
-          </div>
-          ${nextMilestone ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">次の予定：${nextMilestone.name}　${nextMilestone.plannedDate || ''}</div>` : ''}
-          ${milestoneRows ? `<div style="border-top:1px solid var(--line); padding-top:6px;">${milestoneRows}</div>` : ''}
-        </div>
-      `;
-      }).join('');
+      progressList.innerHTML = renderProgressCards(data.sites || []);
     })
     .catch(() => {
       progressList.innerHTML = '<div class="hint">進捗の取得に失敗しました</div>';
@@ -847,39 +837,17 @@ function initAdmin(){
   document.getElementById('dateLabel').textContent =
     new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
 
-  function judgementBadge(j){
-    if(j === '順調') return '<span class="badge ok">順調</span>';
-    if(j === '遅れ') return '<span class="badge bad">遅れ</span>';
-    return '<span class="badge neutral">未判定</span>';
-  }
-
   function loadDashboard(){
     document.getElementById('loading').style.display = 'block';
     document.getElementById('errorMsgAdmin').style.display = 'none';
-    document.getElementById('table').style.display = 'none';
+    document.getElementById('dashboardList').style.display = 'none';
 
-    fetch(GAS_URL + '?action=dashboard', { cache: 'no-store' })
+    fetch(GAS_URL + '?action=gantt', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
-        const sites = data.sites || [];
-        const tbody = document.getElementById('tbody');
-        tbody.innerHTML = '';
-        sites.forEach(s => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>
-              <div class="site-name">${s.siteName}</div>
-              <div class="site-id">${s.siteId}</div>
-            </td>
-            <td>${s.currentStageName}</td>
-            <td>${s.nextMilestoneName ? s.nextMilestoneName + ' ' + s.nextMilestoneDate : '<span class="muted">-</span>'}</td>
-            <td>${judgementBadge(s.judgement)}</td>
-            <td class="muted">${s.lastReporter ? s.lastReporter + '　' + s.lastUpdated : '未報告'}</td>
-          `;
-          tbody.appendChild(tr);
-        });
+        document.getElementById('dashboardList').innerHTML = renderProgressCards(data.sites || []);
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('table').style.display = 'table';
+        document.getElementById('dashboardList').style.display = 'block';
       })
       .catch(() => {
         document.getElementById('loading').style.display = 'none';
