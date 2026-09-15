@@ -578,9 +578,14 @@ function judgementBadgeSmall(j){
   if (j === '遅れ') return '<span class="badge bad">遅れ</span>';
   return '<span class="badge neutral">未判定</span>';
 }
+function overallStatusBadge(currentStageNumber, totalMilestones){
+  if (!currentStageNumber) return '<span class="badge neutral">未着工</span>';
+  if (totalMilestones && currentStageNumber >= totalMilestones) return '<span class="badge ok">完了</span>';
+  return '<span class="badge neutral">継続中</span>';
+}
 function loadProgress(){
   progressList.innerHTML = '<div class="hint">読み込み中...</div>';
-  fetch(GAS_URL + '?action=dashboard')
+  fetch(GAS_URL + '?action=gantt')
     .then(r => r.json())
     .then(data => {
       const sites = data.sites || [];
@@ -588,16 +593,40 @@ function loadProgress(){
         progressList.innerHTML = '<div class="hint">現場が登録されていません</div>';
         return;
       }
-      progressList.innerHTML = sites.map(s => `
+      progressList.innerHTML = sites.map(s => {
+        const milestones = s.milestones || [];
+        const total = milestones.length ? milestones[milestones.length - 1].number : 0;
+        const nextMilestone = milestones.find(m => m.number > s.currentStageNumber);
+
+        const milestoneRows = milestones.map(m => {
+          let icon, color;
+          if (m.number < s.currentStageNumber || (m.number === s.currentStageNumber && s.currentStageNumber >= total)) {
+            icon = '✓'; color = 'var(--ok-fg)';
+          } else if (m.number === s.currentStageNumber) {
+            icon = '▶'; color = 'var(--accent)';
+          } else {
+            icon = '○'; color = 'var(--ink-soft)';
+          }
+          return `
+            <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12.5px;">
+              <span style="color:${color}; font-weight:700; width:14px; text-align:center;">${icon}</span>
+              <span style="color:${color === 'var(--ink-soft)' ? 'var(--ink-soft)' : 'var(--ink)'};">${m.name}</span>
+              <span style="margin-left:auto; color:var(--ink-soft); font-size:11.5px;">${m.plannedDate || ''}</span>
+            </div>
+          `;
+        }).join('');
+
+        return `
         <div class="card" style="margin-bottom:10px;">
           <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
             <div style="font-weight:700; font-size:14.5px;">${s.siteName}</div>
-            ${judgementBadgeSmall(s.judgement)}
+            <div style="display:flex; gap:6px;">${overallStatusBadge(s.currentStageNumber, total)}${judgementBadgeSmall(s.judgement)}</div>
           </div>
-          <div style="font-size:13px; color:var(--ink-soft);">現在：${s.currentStageName}</div>
-          ${s.nextMilestoneName ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-top:2px;">次の予定：${s.nextMilestoneName}　${s.nextMilestoneDate}</div>` : ''}
+          ${nextMilestone ? `<div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">次の予定：${nextMilestone.name}　${nextMilestone.plannedDate || ''}</div>` : ''}
+          ${milestoneRows ? `<div style="border-top:1px solid var(--line); padding-top:6px;">${milestoneRows}</div>` : ''}
         </div>
-      `).join('');
+      `;
+      }).join('');
     })
     .catch(() => {
       progressList.innerHTML = '<div class="hint">進捗の取得に失敗しました</div>';
