@@ -484,6 +484,8 @@
         <div class="field" id="aiPromptField" style="display:none;">
           <label>AIへの指示（プロンプト・編集できます）</label>
           <textarea id="aiPromptText" style="min-height:110px; font-size:12.5px;"></textarea>
+          <button type="button" id="copyPromptBtn" style="margin-top:8px; padding:8px 16px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer;">📋 プロンプトをコピー</button>
+          <span id="copyPromptMsg" style="margin-left:8px; font-size:12px; color:var(--ok-fg);"></span>
           <div class="hint">工事区分の扱い方や、工程のまとめ方などを自由に書き換えられます。空欄のまま実行すると、この初期値がそのまま使われます。</div>
         </div>
         <div class="field">
@@ -736,14 +738,15 @@ siteSelect.addEventListener('change', () => {
       }
       statusGroup.innerHTML = '';
       milestones.forEach(m => {
+        const label = m.detail ? (m.name + '｜' + m.detail) : m.name;
         const btn = document.createElement('div');
         btn.className = 'status-btn';
-        btn.textContent = m.name;
+        btn.textContent = label;
         btn.dataset.number = m.number;
         btn.addEventListener('click', () => {
           document.querySelectorAll('#statusGroup .status-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          selectedStage = { number: m.number, name: m.name };
+          selectedStage = { number: m.number, name: label };
           stageStatusField.style.display = 'block';
         });
         statusGroup.appendChild(btn);
@@ -1079,6 +1082,22 @@ function initAdmin(){
         document.getElementById('aiPromptText').value = DEFAULT_AI_PROMPT;
       }
     });
+  });
+
+  document.getElementById('copyPromptBtn').addEventListener('click', async () => {
+    const text = document.getElementById('aiPromptText').value;
+    const msgEl = document.getElementById('copyPromptMsg');
+    try {
+      await navigator.clipboard.writeText(text);
+      msgEl.textContent = 'コピーしました';
+    } catch (err) {
+      // クリップボードAPIが使えない環境向けのフォールバック
+      const ta = document.getElementById('aiPromptText');
+      ta.select();
+      document.execCommand('copy');
+      msgEl.textContent = 'コピーしました';
+    }
+    setTimeout(() => { msgEl.textContent = ''; }, 2000);
   });
 
   // PDFの各ページをPNG画像（base64）に変換する
