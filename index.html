@@ -302,6 +302,13 @@
               <div class="hint" id="statusPlaceholder">現場を選ぶと工程が表示されます</div>
             </div>
           </div>
+          <div class="field" id="stageStatusField" style="display:none;">
+            <label>この工程は<span class="req">必須</span></label>
+            <div class="status-group" id="stageStatusGroup">
+              <div class="status-btn" data-status="継続">継続（まだ終わっていない）</div>
+              <div class="status-btn" data-status="完了">完了（今日で終わった）</div>
+            </div>
+          </div>
           <div class="field">
             <label>作業内容<span class="req">必須</span></label>
             <textarea id="content" placeholder="今日やった作業を簡単に入力してください"></textarea>
@@ -372,7 +379,7 @@
       <div class="tab-btn" data-tab="instruct">指示配信</div>
       <div class="tab-btn" data-tab="log">指示履歴</div>
       <div class="tab-btn" data-tab="assign">人員配置</div>
-      <div class="tab-btn" data-tab="gantt">工程表</div>
+      <a href="kotei.html" target="_blank" class="tab-btn" style="text-decoration:none; display:inline-block;">工程表 ↗</a>
     </div>
 
     <div class="panel active" id="panel-dashboard">
@@ -430,26 +437,6 @@
           <tr><th>職人</th><th>現場</th><th>工程</th><th>時刻</th></tr>
         </thead>
         <tbody id="assignTbody"></tbody>
-      </table>
-    </div>
-
-    <div class="panel" id="panel-gantt">
-      <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
-      <div class="muted" style="margin:10px 0 14px;">案件ごとの工程状況です。詳しい日程はGoogleカレンダーでご確認ください。</div>
-      <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
-        <a href="https://calendar.google.com/calendar/u/0/r?cid=a5c79a05d0893095e3a451ac70c9fa09ce3b4013c8c3fd82161d43816b304beb%40group.calendar.google.com" target="_blank" style="text-decoration:none;">
-          <button type="button">📅 計画カレンダーを開く</button>
-        </a>
-        <a href="https://calendar.google.com/calendar/u/0/r?cid=62aa16be36b04efff547100121ebcc859cff17cff43b684fe3aa2a6e7259c3a7%40group.calendar.google.com" target="_blank" style="text-decoration:none;">
-          <button type="button">📅 実績カレンダーを開く</button>
-        </a>
-      </div>
-      <div id="ganttLoading" class="hint">読み込み中...</div>
-      <table id="ganttTable" style="display:none;">
-        <thead>
-          <tr><th>現場</th><th>状況</th><th>判定</th></tr>
-        </thead>
-        <tbody id="ganttTbody"></tbody>
       </table>
     </div>
   </div>
@@ -638,9 +625,15 @@ function loadSites(){
 loadSites();
 
 const statusGroup = document.getElementById('statusGroup');
+const stageStatusField = document.getElementById('stageStatusField');
+let selectedStageStatus = null;
+
 siteSelect.addEventListener('change', () => {
   const siteId = siteSelect.value;
   selectedStage = null;
+  selectedStageStatus = null;
+  stageStatusField.style.display = 'none';
+  document.querySelectorAll('#stageStatusGroup .status-btn').forEach(b => b.classList.remove('active'));
   if(!siteId){
     statusGroup.innerHTML = '<div class="hint">現場を選ぶと工程が表示されます</div>';
     return;
@@ -661,9 +654,10 @@ siteSelect.addEventListener('change', () => {
         btn.textContent = m.name;
         btn.dataset.number = m.number;
         btn.addEventListener('click', () => {
-          document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('#statusGroup .status-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           selectedStage = { number: m.number, name: m.name };
+          stageStatusField.style.display = 'block';
         });
         statusGroup.appendChild(btn);
       });
@@ -671,6 +665,14 @@ siteSelect.addEventListener('change', () => {
     .catch(() => {
       statusGroup.innerHTML = '<div class="hint">工程一覧の取得に失敗しました</div>';
     });
+});
+
+document.querySelectorAll('#stageStatusGroup .status-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#stageStatusGroup .status-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedStageStatus = btn.dataset.status;
+  });
 });
 
 const photoInput = document.getElementById('photoInput');
@@ -703,6 +705,7 @@ submitBtn.addEventListener('click', () => {
   if(!worker){ showMsg('お名前を正しく入力してください', true); return; }
   if(!siteId){ showMsg('現場を選択してください', true); return; }
   if(!selectedStage){ showMsg('工程を選択してください', true); return; }
+  if(!selectedStageStatus){ showMsg('「継続」か「完了」かを選択してください', true); return; }
   if(!content){ showMsg('作業内容を入力してください', true); return; }
 
   submitBtn.disabled = true;
@@ -712,6 +715,7 @@ submitBtn.addEventListener('click', () => {
     worker, siteId, siteName,
     stageNumber: selectedStage.number,
     stageName: selectedStage.name,
+    stageStatus: selectedStageStatus,
     content, photos
   };
 
@@ -723,7 +727,7 @@ submitBtn.addEventListener('click', () => {
   .then(r => r.json())
   .then(res => {
     if(res.result === 'ok'){
-      document.getElementById('doneDetail').textContent = `${siteName} / ${selectedStage.name} で報告しました`;
+      document.getElementById('doneDetail').textContent = `${siteName} / ${selectedStage.name}（${selectedStageStatus}） で報告しました`;
       document.getElementById('formScreen').classList.add('hidden');
       document.getElementById('submitBar').classList.add('hidden');
       document.getElementById('doneScreen').classList.remove('hidden');
@@ -741,6 +745,9 @@ document.getElementById('againBtn').addEventListener('click', () => {
   photoPreview.innerHTML = '';
   photos = [];
   selectedStage = null;
+  selectedStageStatus = null;
+  stageStatusField.style.display = 'none';
+  document.querySelectorAll('#stageStatusGroup .status-btn').forEach(b => b.classList.remove('active'));
   siteSelect.value = '';
   statusGroup.innerHTML = '<div class="hint">現場を選ぶと工程が表示されます</div>';
   statusMsg.textContent = '';
@@ -846,60 +853,19 @@ function initAdmin(){
 
   let logLoaded = false;
   let assignLoaded = false;
-  let ganttLoaded = false;
   function switchAdminTab(name){
-    document.querySelectorAll('#adminMain .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('#adminMain .tab-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('#adminMain .panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     if (name === 'log' && !logLoaded) { loadInstructionLog(); logLoaded = true; }
     if (name === 'assign' && !assignLoaded) { loadTodayAssignment(); assignLoaded = true; }
-    if (name === 'gantt' && !ganttLoaded) { loadGantt(); ganttLoaded = true; }
   }
-  document.querySelectorAll('#adminMain .tab-btn').forEach(btn => {
+  document.querySelectorAll('#adminMain .tab-btn[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchAdminTab(btn.dataset.tab));
   });
-  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link, #panel-assign .back-link, #panel-gantt .back-link').forEach(link => {
+  document.querySelectorAll('#panel-instruct .back-link, #panel-log .back-link, #panel-assign .back-link').forEach(link => {
     link.addEventListener('click', () => switchAdminTab(link.dataset.backto));
   });
-
-  function loadGantt(){
-    const loading = document.getElementById('ganttLoading');
-    const table = document.getElementById('ganttTable');
-    const tbody = document.getElementById('ganttTbody');
-    loading.style.display = 'block';
-    table.style.display = 'none';
-
-    fetch(GAS_URL + '?action=gantt')
-      .then(r => r.json())
-      .then(data => {
-        const sites = data.sites || [];
-        if (sites.length === 0) {
-          loading.textContent = '現場が登録されていません';
-          return;
-        }
-
-        tbody.innerHTML = sites.map(s => {
-          const total = s.milestones && s.milestones.length ? s.milestones[s.milestones.length - 1].number : 0;
-          let statusLabel, statusClass;
-          if (!s.currentStageNumber) { statusLabel = '未着工'; statusClass = 'neutral'; }
-          else if (total && s.currentStageNumber >= total) { statusLabel = '完了'; statusClass = 'ok'; }
-          else { statusLabel = '進行中'; statusClass = 'neutral'; }
-          return `
-            <tr>
-              <td>${s.siteName}</td>
-              <td><span class="badge ${statusClass}">${statusLabel}</span></td>
-              <td>${judgementBadge(s.judgement)}</td>
-            </tr>
-          `;
-        }).join('');
-
-        loading.style.display = 'none';
-        table.style.display = 'table';
-      })
-      .catch(() => {
-        loading.textContent = '工程表の取得に失敗しました';
-      });
-  }
 
   function loadTodayAssignment(){
     const loading = document.getElementById('assignLoading');
