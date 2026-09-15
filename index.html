@@ -233,39 +233,6 @@
   .form-card button{ padding:12px 20px; border-radius:9px; border:none; background:var(--accent); color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; }
   #instructMsg{ margin-top:10px; font-size:13px; font-weight:600; }
 
-  /* 工程表（ガントチャート） */
-  .gantt-axis{
-    position:relative; height:22px; margin-bottom:6px;
-    font-size:11px; color:var(--ink-soft);
-  }
-  .gantt-axis span{ position:absolute; transform:translateX(-50%); }
-  .gantt-row{
-    display:flex; align-items:center; gap:12px; margin-bottom:10px;
-  }
-  .gantt-label{
-    width:150px; flex-shrink:0; font-size:13px; font-weight:600;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .gantt-track{
-    position:relative; flex:1; height:28px;
-    background:var(--card); border:1px solid var(--line); border-radius:8px;
-  }
-  .gantt-span{
-    position:absolute; top:50%; height:4px; transform:translateY(-50%);
-    background:var(--line); border-radius:2px;
-  }
-  .gantt-dot{
-    position:absolute; top:50%; width:14px; height:14px; border-radius:50%;
-    transform:translate(-50%,-50%); border:2px solid #fff; cursor:default;
-  }
-  .gantt-dot.done{ background:var(--ok-fg); }
-  .gantt-dot.next{ background:var(--accent); }
-  .gantt-dot.future{ background:var(--neutral-fg); }
-  .gantt-today{
-    position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--accent);
-    z-index:5;
-  }
-
   /* ログインゲート・役割選択 */
   #loginGate{
     position:fixed; inset:0; background:var(--bg);
@@ -468,9 +435,22 @@
 
     <div class="panel" id="panel-gantt">
       <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
-      <div class="muted" style="margin:10px 0 14px;">工程マスタの予定日をもとに、各現場の工程を横棒で表示しています（オレンジの縦線が今日）</div>
+      <div class="muted" style="margin:10px 0 14px;">案件ごとの工程状況です。詳しい日程はGoogleカレンダーでご確認ください。</div>
+      <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+        <a href="https://calendar.google.com/calendar/u/0/r?cid=a5c79a05d0893095e3a451ac70c9fa09ce3b4013c8c3fd82161d43816b304beb%40group.calendar.google.com" target="_blank" style="text-decoration:none;">
+          <button type="button">📅 計画カレンダーを開く</button>
+        </a>
+        <a href="https://calendar.google.com/calendar/u/0/r?cid=62aa16be36b04efff547100121ebcc859cff17cff43b684fe3aa2a6e7259c3a7%40group.calendar.google.com" target="_blank" style="text-decoration:none;">
+          <button type="button">📅 実績カレンダーを開く</button>
+        </a>
+      </div>
       <div id="ganttLoading" class="hint">読み込み中...</div>
-      <div id="ganttChart" style="display:none;"></div>
+      <table id="ganttTable" style="display:none;">
+        <thead>
+          <tr><th>現場</th><th>状況</th><th>判定</th></tr>
+        </thead>
+        <tbody id="ganttTbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -884,72 +864,37 @@ function initAdmin(){
 
   function loadGantt(){
     const loading = document.getElementById('ganttLoading');
-    const chart = document.getElementById('ganttChart');
+    const table = document.getElementById('ganttTable');
+    const tbody = document.getElementById('ganttTbody');
     loading.style.display = 'block';
-    chart.style.display = 'none';
+    table.style.display = 'none';
 
     fetch(GAS_URL + '?action=gantt')
       .then(r => r.json())
       .then(data => {
-        const sites = (data.sites || []).filter(s => s.milestones && s.milestones.length > 0);
+        const sites = data.sites || [];
         if (sites.length === 0) {
-          loading.textContent = '工程が登録されている現場がありません';
+          loading.textContent = '現場が登録されていません';
           return;
         }
 
-        // 全現場・全工程の予定日から、表示する日付の範囲を決める（今日も範囲に含める）
-        let allDates = [];
-        sites.forEach(s => s.milestones.forEach(m => { if (m.plannedDate) allDates.push(new Date(m.plannedDate)); }));
-        const today = new Date();
-        allDates.push(today);
-        let minDate = new Date(Math.min.apply(null, allDates));
-        let maxDate = new Date(Math.max.apply(null, allDates));
-        // 見やすいよう前後に少し余白を持たせる
-        minDate.setDate(minDate.getDate() - 2);
-        maxDate.setDate(maxDate.getDate() + 2);
-        const totalMs = maxDate - minDate || 1;
-
-        function pct(dateStr){
-          const d = new Date(dateStr);
-          return ((d - minDate) / totalMs) * 100;
-        }
-        function fmtShort(d){
-          return (d.getMonth()+1) + '/' + d.getDate();
-        }
-
-        const todayPct = pct(today);
-
-        let html = '<div class="gantt-axis">' +
-          '<span style="left:0%;">' + fmtShort(minDate) + '</span>' +
-          '<span style="left:50%;">' + fmtShort(new Date((minDate.getTime()+maxDate.getTime())/2)) + '</span>' +
-          '<span style="left:100%; transform:translateX(-100%);">' + fmtShort(maxDate) + '</span>' +
-          '</div>';
-
-        sites.forEach(s => {
-          const ms = s.milestones.filter(m => m.plannedDate);
-          if (ms.length === 0) return;
-          const first = pct(ms[0].plannedDate);
-          const last = pct(ms[ms.length-1].plannedDate);
-          let dots = '';
-          ms.forEach(m => {
-            const cls = m.number < s.currentStageNumber ? 'done' : (m.number === s.currentStageNumber ? 'done' : (m.number === s.currentStageNumber + 1 ? 'next' : 'future'));
-            dots += `<div class="gantt-dot ${cls}" style="left:${pct(m.plannedDate)}%;" title="${m.name}（${m.plannedDate}）"></div>`;
-          });
-          html += `
-            <div class="gantt-row">
-              <div class="gantt-label" title="${s.siteName}">${s.siteName}</div>
-              <div class="gantt-track">
-                <div class="gantt-span" style="left:${first}%; width:${Math.max(last-first,0)}%;"></div>
-                <div class="gantt-today" style="left:${todayPct}%;"></div>
-                ${dots}
-              </div>
-            </div>
+        tbody.innerHTML = sites.map(s => {
+          const total = s.milestones && s.milestones.length ? s.milestones[s.milestones.length - 1].number : 0;
+          let statusLabel, statusClass;
+          if (!s.currentStageNumber) { statusLabel = '未着工'; statusClass = 'neutral'; }
+          else if (total && s.currentStageNumber >= total) { statusLabel = '完了'; statusClass = 'ok'; }
+          else { statusLabel = '進行中'; statusClass = 'neutral'; }
+          return `
+            <tr>
+              <td>${s.siteName}</td>
+              <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+              <td>${judgementBadge(s.judgement)}</td>
+            </tr>
           `;
-        });
+        }).join('');
 
-        chart.innerHTML = html;
         loading.style.display = 'none';
-        chart.style.display = 'block';
+        table.style.display = 'table';
       })
       .catch(() => {
         loading.textContent = '工程表の取得に失敗しました';
