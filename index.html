@@ -451,13 +451,34 @@
 
     <div class="panel" id="panel-import">
       <div class="back-link" data-backto="dashboard">← 進捗状況にもどる</div>
+
+      <div class="form-card" style="margin-bottom:16px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:12px;">① 新しい現場を登録する</div>
+        <div class="field">
+          <label>現場ID</label>
+          <input type="text" id="newSiteId" placeholder="例：S005">
+        </div>
+        <div class="field">
+          <label>現場名</label>
+          <input type="text" id="newSiteName" placeholder="例：○○様邸 新築工事">
+        </div>
+        <button id="addSiteBtn">現場を登録する</button>
+        <div id="addSiteMsg"></div>
+      </div>
+
       <div class="form-card">
+        <div style="font-weight:700; font-size:14px; margin-bottom:12px;">② 工程を登録する</div>
         <div class="field">
           <label>登録先の現場</label>
           <select id="importSite"></select>
         </div>
         <div class="field">
-          <label>Excelから貼り付け（工程名・開始日・終了予定日の3列を選択してコピー）</label>
+          <label>PDFから読み込む（文字ベースの表形式のみ対応）</label>
+          <input type="file" id="importPdf" accept="application/pdf">
+          <div class="hint">「工程名・開始日・終了日」が横に並ぶ、文字の表になっているPDFに対応しています。バーで期間を表すガントチャート形式のPDFは読み取れません。</div>
+        </div>
+        <div class="field">
+          <label>またはExcelから貼り付け（工程名・開始日・終了予定日の3列を選択してコピー）</label>
           <textarea id="importText" style="min-height:140px; font-family:monospace; font-size:12.5px;" placeholder="現場調査&#9;2026-10-01&#9;2026-10-15&#10;提出・承認&#9;2026-10-15&#9;2026-10-26&#10;（Excelでこの3列を範囲選択してコピーし、ここに貼り付けてください）"></textarea>
           <div class="hint">1行に「工程名」「開始日」「終了予定日」をタブ区切りで。Excelで3列を選択してそのままコピペすればOKです。既存の工程の続き番号から追加されます。</div>
         </div>
@@ -468,6 +489,8 @@
     </div>
   </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <script>
 // ==== 設定：GASのWebアプリURL ====
@@ -916,6 +939,43 @@ function initAdmin(){
       });
   }
 
+  document.getElementById('addSiteBtn').addEventListener('click', () => {
+    const siteId = document.getElementById('newSiteId').value.trim();
+    const siteName = document.getElementById('newSiteName').value.trim();
+    const msgEl = document.getElementById('addSiteMsg');
+
+    if (!siteId || !siteName) {
+      msgEl.textContent = '現場IDと現場名を入力してください';
+      msgEl.style.color = '#b3261e';
+      return;
+    }
+    msgEl.textContent = '登録中...';
+    msgEl.style.color = '#565d68';
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ type: 'addSite', siteId, siteName })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.result === 'ok') {
+        msgEl.textContent = '「' + siteName + '」を登録しました';
+        msgEl.style.color = '#1f6f4a';
+        document.getElementById('newSiteId').value = '';
+        document.getElementById('newSiteName').value = '';
+        loadImportSites();
+      } else {
+        msgEl.textContent = '登録に失敗しました：' + (res.message || '');
+        msgEl.style.color = '#b3261e';
+      }
+    })
+    .catch(() => {
+      msgEl.textContent = '通信エラーが発生しました';
+      msgEl.style.color = '#b3261e';
+    });
+  });
+
   function parseImportText(text){
     return text.split('\n')
       .map(line => line.trim())
@@ -926,6 +986,101 @@ function initAdmin(){
       })
       .filter(row => row.name && row.startDate && row.endDate);
   }
+
+  // PDF（文字ベースの表）から工程名・開始日・終了日を推定してタブ区切りテキストに変換する
+  function normalizeDate(s){
+    const m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+    if (!m) return null;
+    return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+  }
+
+  async function extractPdfLines(file){
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const lines = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const items = content.items.map(it => ({
+        text: it.str,
+        x: it.transform[4],
+        y: Math.round(it.transform[5])
+      })).filter(it => it.text.trim());
+
+      // 同じY座標（行）ごとにグループ化
+      const byY = {};
+      items.forEach(it => {
+        const key = it.y;
+        if (!byY[key]) byY[key] = [];
+        byY[key].push(it);
+      });
+      Object.keys(byY).sort((a, b) => b - a).forEach(y => {
+        const rowItems = byY[y].sort((a, b) => a.x - b.x);
+        let line = '';
+        let lastX = null;
+        rowItems.forEach(it => {
+          if (lastX !== null && it.x - lastX > 15) line += '\t';
+          else if (line) line += ' ';
+          line += it.text.trim();
+          lastX = it.x + it.text.length * 5;
+        });
+        if (line.trim()) lines.push(line);
+      });
+    }
+    return lines;
+  }
+
+  function pdfLinesToRows(lines){
+    const rows = [];
+    lines.forEach(line => {
+      const cols = line.split('\t').map(c => c.trim()).filter(c => c);
+      if (cols.length >= 3) {
+        const d1 = normalizeDate(cols[cols.length - 2]);
+        const d2 = normalizeDate(cols[cols.length - 1]);
+        if (d1 && d2) {
+          const name = cols.slice(0, cols.length - 2).join(' ');
+          if (name) { rows.push({ name, startDate: d1, endDate: d2 }); return; }
+        }
+      }
+      // タブ区切りでうまく分かれなかった場合、行内の日付らしき文字列を2つ探す
+      const dateMatches = [...line.matchAll(/\d{4}[\/\-年]\d{1,2}[\/\-月]\d{1,2}日?/g)];
+      if (dateMatches.length >= 2) {
+        const d1 = normalizeDate(dateMatches[0][0]);
+        const d2 = normalizeDate(dateMatches[1][0]);
+        let name = line;
+        dateMatches.slice(0, 2).forEach(m => { name = name.replace(m[0], ''); });
+        name = name.replace(/\t/g, ' ').trim();
+        if (d1 && d2 && name) rows.push({ name, startDate: d1, endDate: d2 });
+      }
+    });
+    return rows;
+  }
+
+  document.getElementById('importPdf').addEventListener('change', async () => {
+    const file = document.getElementById('importPdf').files[0];
+    if (!file) return;
+    const msgEl = document.getElementById('importMsg');
+    msgEl.textContent = 'PDFを読み込み中...';
+    msgEl.style.color = '#565d68';
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const lines = await extractPdfLines(file);
+      const rows = pdfLinesToRows(lines);
+      if (rows.length === 0) {
+        msgEl.textContent = 'このPDFからは工程を読み取れませんでした（文字ベースの表形式のみ対応しています）';
+        msgEl.style.color = '#b3261e';
+        return;
+      }
+      const textarea = document.getElementById('importText');
+      textarea.value = rows.map(r => `${r.name}\t${r.startDate}\t${r.endDate}`).join('\n');
+      textarea.dispatchEvent(new Event('input'));
+      msgEl.textContent = rows.length + '件を読み取りました。内容を確認してから「この内容を取り込む」を押してください';
+      msgEl.style.color = '#1f6f4a';
+    } catch (err) {
+      msgEl.textContent = 'PDFの読み込みに失敗しました';
+      msgEl.style.color = '#b3261e';
+    }
+  });
 
   document.getElementById('importText').addEventListener('input', () => {
     const rows = parseImportText(document.getElementById('importText').value);
