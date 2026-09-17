@@ -571,9 +571,25 @@ const instructionsList = document.getElementById('instructionsList');
 let currentWorker = '';
 
 workerNameInput.addEventListener('blur', checkWorkerName);
+workerNameInput.addEventListener('input', checkWorkerName);
 workerNameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); checkWorkerName(); workerNameInput.blur(); }
 });
+setFormFieldsEnabled(false);
+
+function setFormFieldsEnabled(enabled){
+  // 名前が確認できるまでは、現場・工程・作業内容・写真など、日報フォームの入力欄そのものを
+  // 操作できないようにする（表示のhidden/表示切替だけに頼らない二重の安全策）
+  document.getElementById('siteSelect').disabled = !enabled;
+  document.getElementById('content').disabled = !enabled;
+  document.getElementById('photoInput').disabled = !enabled;
+  document.querySelectorAll('#statusGroup .status-btn, #stageStatusGroup .status-btn').forEach(btn => {
+    btn.style.pointerEvents = enabled ? '' : 'none';
+    btn.style.opacity = enabled ? '' : '0.5';
+  });
+  const btn = document.getElementById('submitBtn');
+  if (btn) btn.disabled = !enabled;
+}
 
 function checkWorkerName(){
   const input = workerNameInput.value.trim();
@@ -581,6 +597,7 @@ function checkWorkerName(){
     currentWorker = '';
     workerNameHint.textContent = '';
     workerTabs.classList.add('hidden');
+    setFormFieldsEnabled(false);
     return;
   }
   const match = VALID_WORKERS.find(w => w === input);
@@ -589,11 +606,13 @@ function checkWorkerName(){
     workerNameHint.textContent = '';
     setupPush(currentWorker);
     workerTabs.classList.remove('hidden');
+    setFormFieldsEnabled(true);
     loadInstructions(currentWorker);
   } else {
     currentWorker = '';
     workerNameHint.textContent = '登録されているお名前と一致しません';
     workerTabs.classList.add('hidden');
+    setFormFieldsEnabled(false);
   }
 }
 
