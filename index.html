@@ -105,6 +105,13 @@
     cursor:pointer;
   }
   .status-btn.active{ background:#fdf1e2; border-color:var(--accent); color:var(--accent-dark); }
+  .status-btn.today-near{ border-color:var(--accent); border-width:2px; box-shadow:0 0 0 2px #fdf1e2; position:relative; }
+  .status-btn.today-near::after{
+    content:"📍今日";
+    position:absolute; top:-9px; left:8px;
+    background:var(--accent); color:#fff; font-size:10px; font-weight:700;
+    padding:1px 6px; border-radius:8px; line-height:1.4;
+  }
   .photo-box{
     display:flex;
     align-items:center;
@@ -756,6 +763,9 @@ siteSelect.addEventListener('change', () => {
         return;
       }
       statusGroup.innerHTML = '';
+      const today = new Date(); today.setHours(0,0,0,0);
+      let nearestBtn = null;
+      let nearestDist = Infinity; // 0なら「今日が期間内」、正の値なら未来までの日数
       milestones.forEach(m => {
         const label = m.detail ? (m.name + '｜' + m.detail) : m.name;
         const btn = document.createElement('div');
@@ -769,7 +779,25 @@ siteSelect.addEventListener('change', () => {
           stageStatusField.style.display = 'block';
         });
         statusGroup.appendChild(btn);
+
+        // 「今日に一番近い工程」を判定：開始日〜終了日の範囲に今日が入っていれば距離0（最優先）。
+        // 範囲外なら、開始日までの日数（未来の工程）を距離として使う（過去に終わった工程より、
+        // これから始まる工程を優先的に指し示す）
+        if (m.startDate) {
+          const s = new Date(m.startDate); s.setHours(0,0,0,0);
+          const e = m.endDate ? new Date(m.endDate) : s;
+          e.setHours(0,0,0,0);
+          let dist;
+          if (today >= s && today <= e) dist = 0;
+          else if (today < s) dist = (s - today) / 86400000;
+          else dist = ((today - e) / 86400000) + 100000; // 終了済みの工程は大きな値にして最後に回す
+          if (dist < nearestDist) { nearestDist = dist; nearestBtn = btn; }
+        }
       });
+      if (nearestBtn) {
+        nearestBtn.classList.add('today-near');
+        setTimeout(() => nearestBtn.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+      }
     })
     .catch(() => {
       statusGroup.innerHTML = '<div class="hint">工程一覧の取得に失敗しました</div>';
