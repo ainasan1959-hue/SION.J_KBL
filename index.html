@@ -777,6 +777,7 @@ siteSelect.addEventListener('change', () => {
           btn.classList.add('active');
           selectedStage = { number: m.number, name: label };
           stageStatusField.style.display = 'block';
+          setTimeout(() => stageStatusField.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
         });
         statusGroup.appendChild(btn);
 
@@ -809,6 +810,8 @@ document.querySelectorAll('#stageStatusGroup .status-btn').forEach(btn => {
     document.querySelectorAll('#stageStatusGroup .status-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     selectedStageStatus = btn.dataset.status;
+    const contentField = document.getElementById('content');
+    setTimeout(() => contentField.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   });
 });
 
