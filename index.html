@@ -945,6 +945,18 @@ document.getElementById('backToReportLink').addEventListener('click', () => {
   document.getElementById('reportScreen').classList.remove('hidden');
 });
 
+// URLに ?ceo=合言葉 が付いていて、値が一致すれば、ログイン画面を経由せず
+// 直接管理者パネルまで進む（PC版KBL管理アプリからのリンク用）
+(function autoCeoLogin() {
+  const params = new URLSearchParams(location.search);
+  const ceoParam = params.get('ceo');
+  if (ceoParam && ceoParam === CEO_PASSWORD) {
+    document.getElementById('reportScreen').classList.add('hidden');
+    document.getElementById('adminScreen').classList.remove('hidden');
+    if (!adminLoaded) { initAdmin(); adminLoaded = true; }
+  }
+})();
+
 function initAdmin(){
   document.getElementById('dateLabel').textContent =
     new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
